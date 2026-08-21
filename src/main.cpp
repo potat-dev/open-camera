@@ -62,19 +62,17 @@ static esp_err_t stream_handler(httpd_req_t* req) {
             Serial.println("Camera capture failed");
             res = ESP_FAIL;
         } else {
-            if (fb->width > 400) {
-                if (fb->format != PIXFORMAT_JPEG) {
-                    bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-                    esp_camera_fb_return(fb);
-                    fb = NULL;
-                    if (!jpeg_converted) {
-                        Serial.println("JPEG compression failed");
-                        res = ESP_FAIL;
-                    }
-                } else {
-                    _jpg_buf_len = fb->len;
-                    _jpg_buf = fb->buf;
+            if (fb->format != PIXFORMAT_JPEG) {
+                bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+                esp_camera_fb_return(fb);
+                fb = NULL;
+                if (!jpeg_converted) {
+                    Serial.println("JPEG compression failed");
+                    res = ESP_FAIL;
                 }
+            } else {
+                _jpg_buf_len = fb->len;
+                _jpg_buf = fb->buf;
             }
         }
 
@@ -103,8 +101,6 @@ static esp_err_t stream_handler(httpd_req_t* req) {
         if (res != ESP_OK) {
             break;
         }
-
-        // Serial.printf("MJPG: %uB\n",(uint32_t)(_jpg_buf_len));
     }
 
     return res;
