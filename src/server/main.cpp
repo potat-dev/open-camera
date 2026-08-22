@@ -122,11 +122,11 @@ static void send_busy(httpd_req_t* req) {
     httpd_resp_send(req, "Camera busy, try again", HTTPD_RESP_USE_STRLEN);
 }
 
-// static void log_psram(const char* label) {
-//     Serial.printf("%s -- free PSRAM: %u bytes, largest free block: %u bytes\n", label,
-//                   (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-//                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
-// }
+static void log_psram(const char* label) {
+    Serial.printf("%s -- free PSRAM: %u bytes, largest free block: %u bytes\n", label,
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+}
 
 struct frame_result_t {
     camera_fb_t* raw_data;
@@ -248,6 +248,8 @@ static esp_err_t photo_handler(httpd_req_t* req) {
         return res;
     }
 
+    log_psram("before capture");
+
     camera_fb_t* fb = esp_camera_fb_get();
 
     if (!fb) {
@@ -268,6 +270,8 @@ static esp_err_t photo_handler(httpd_req_t* req) {
         Serial.printf("JPEG size: %u bytes\n", (unsigned)ctx.total_len);
         res = httpd_resp_send_chunk(req, NULL, 0);  // required to terminate a chunked response
     }
+
+    log_psram("after capture");
 
     release_camera();
     return res;
