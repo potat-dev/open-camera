@@ -122,11 +122,11 @@ static void send_busy(httpd_req_t* req) {
     httpd_resp_send(req, "Camera busy, try again", HTTPD_RESP_USE_STRLEN);
 }
 
-static void log_psram(const char* label) {
-    Serial.printf("%s -- free PSRAM: %u bytes, largest free block: %u bytes\n", label,
-                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
-}
+// static void log_psram(const char* label) {
+//     Serial.printf("%s -- free PSRAM: %u bytes, largest free block: %u bytes\n", label,
+//                   (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+//                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+// }
 
 struct frame_result_t {
     camera_fb_t* raw_data;
@@ -134,14 +134,14 @@ struct frame_result_t {
     size_t len;
 };
 
-static bool capture(frame_result_t& result, uint8_t quality) {
+static esp_err_t capture(frame_result_t& result, uint8_t quality) {
     result.raw_data = esp_camera_fb_get();
     result.data = NULL;
     result.len = 0;
 
     if (!result.raw_data) {
         Serial.println("Camera capture failed");
-        return false;
+        return ESP_FAIL;
     }
 
     // TODO: needs to be done only if raw_data pixfmt is not JPEG
@@ -152,10 +152,10 @@ static bool capture(frame_result_t& result, uint8_t quality) {
 
     if (!converted) {
         Serial.println("JPEG compression failed");
-        return false;
+        return ESP_FAIL;
     }
 
-    return true;
+    return ESP_OK;
 }
 
 static void release_frame(frame_result_t& result) {
@@ -166,6 +166,8 @@ static void release_frame(frame_result_t& result) {
     }
 }
 
+// --- Camera Feed Stream ---
+
 static esp_err_t stream_handler(httpd_req_t* req) {
     cam_mode_t* mode = (cam_mode_t*)req->user_ctx;
 
@@ -173,6 +175,7 @@ static esp_err_t stream_handler(httpd_req_t* req) {
         send_busy(req);
         return ESP_FAIL;
     }
+
     if (!ensure_camera_mode(*mode)) {
         release_camera();
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Camera init failed");
@@ -203,14 +206,26 @@ static esp_err_t stream_handler(httpd_req_t* req) {
         }
 
         release_frame(frame);
-
-        if (res != ESP_OK) {
-            break;
-        }
+        if (res != ESP_OK) break;
     }
 
     release_camera();
     return res;
+}
+
+// --- Single Photo Capture ---
+
+struct photo_chunk_ctx_t {
+    httpd_req_t* req;
+    size_t total_len;
+};
+
+static size_t send_photo_chunk(void* arg, size_t index, const void* data, size_t len) {
+    photo_chunk_ctx_t* ctx = (photo_chunk_ctx_t*)arg;
+    if (index == 0) ctx->total_len = 0;
+    if (httpd_resp_send_chunk(ctx->req, (const char*)data, len) != ESP_OK) return 0;
+    ctx->total_len += len;
+    return len;
 }
 
 static esp_err_t photo_handler(httpd_req_t* req) {
@@ -220,30 +235,41 @@ static esp_err_t photo_handler(httpd_req_t* req) {
         send_busy(req);
         return ESP_FAIL;
     }
+
     if (!ensure_camera_mode(*mode)) {
         release_camera();
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Camera init failed");
         return ESP_FAIL;
     }
 
-    log_psram("before capture");
-
-    frame_result_t frame;
-    if (!capture(frame, mode->quality)) {
+    esp_err_t res = httpd_resp_set_type(req, "image/jpeg");
+    if (res != ESP_OK) {
         release_camera();
+        return res;
+    }
+
+    camera_fb_t* fb = esp_camera_fb_get();
+
+    if (!fb) {
+        release_camera();
+        Serial.println("Camera capture failed");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Capture failed");
         return ESP_FAIL;
     }
 
-    log_psram("after capture");
-    Serial.printf("JPEG size: %u bytes\n", (unsigned)frame.len);
+    photo_chunk_ctx_t ctx = {req, 0};
+    bool ok = frame2jpg_cb(fb, mode->quality, send_photo_chunk, &ctx);
+    esp_camera_fb_return(fb);
 
-    httpd_resp_set_type(req, "image/jpeg");
-    esp_err_t res = httpd_resp_send(req, (const char*)frame.data, frame.len);
+    if (!ok) {
+        Serial.println("JPEG encode/send failed");
+        res = ESP_FAIL;
+    } else {
+        Serial.printf("JPEG size: %u bytes\n", (unsigned)ctx.total_len);
+        res = httpd_resp_send_chunk(req, NULL, 0);  // required to terminate a chunked response
+    }
 
-    release_frame(frame);
     release_camera();
-
     return res;
 }
 
