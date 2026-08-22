@@ -29,10 +29,6 @@
 #define D6_GPIO 13
 #define D7_GPIO 14
 
-#define PIXEL_FORMAT PIXFORMAT_RGB565
-
-#define FRAME_BUFFER_COUNT 2
-
 #define CLOCK_FREQUENCY 20000000
 
 #define PART_BOUNDARY "123456789000000000000987654321"
@@ -48,15 +44,18 @@ static SemaphoreHandle_t camera_mutex;
 struct cam_mode_t {
     framesize_t framesize;
     pixformat_t pixformat;  // can be RGB565 or YUV422, never JPEG
+    size_t fb_count;
+    uint8_t quality;  // for frame2jpg
 
     bool operator==(const cam_mode_t&) const = default;
 };
 
-static cam_mode_t MODE_STREAM_QVGA = {FRAMESIZE_QVGA, PIXFORMAT_RGB565};
-static cam_mode_t MODE_STREAM_HVGA = {FRAMESIZE_HVGA, PIXFORMAT_RGB565};
-static cam_mode_t MODE_PHOTO_SXGA = {FRAMESIZE_SXGA, PIXFORMAT_RGB565};
-static cam_mode_t MODE_PHOTO_UXGA = {FRAMESIZE_UXGA, PIXFORMAT_RGB565};
-static cam_mode_t MODE_NONE = {FRAMESIZE_INVALID, PIXFORMAT_RAW};
+static cam_mode_t MODE_STREAM_MEDIUM = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2, 80};
+static cam_mode_t MODE_STREAM_HIGH = {FRAMESIZE_HVGA, PIXFORMAT_RGB565, 2, 80};
+static cam_mode_t MODE_PHOTO_MEDIUM = {FRAMESIZE_SXGA, PIXFORMAT_RGB565, 1, 85};
+static cam_mode_t MODE_PHOTO_HIGH = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1, 85};
+
+static cam_mode_t MODE_NONE = {FRAMESIZE_INVALID, PIXFORMAT_RAW, 0, 0};
 
 static cam_mode_t current_mode = MODE_NONE;
 
@@ -75,7 +74,7 @@ static camera_config_t build_config(const cam_mode_t& mode) {
     config.pin_d6 = D6_GPIO;
     config.pin_d7 = D7_GPIO;
 
-    config.pin_xclk = NOT_CONNECTED;
+    config.pin_xclk = NOT_CONNECTED;  // sensor has its own oscillator
     config.pin_pwdn = NOT_CONNECTED;
     config.pin_reset = NOT_CONNECTED;
 
@@ -87,8 +86,8 @@ static camera_config_t build_config(const cam_mode_t& mode) {
 
     config.pixel_format = mode.pixformat;
     config.frame_size = mode.framesize;
+    config.fb_count = mode.fb_count;
 
-    config.fb_count = FRAME_BUFFER_COUNT;
     config.grab_mode = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CLOCK_FREQUENCY;
 
@@ -97,7 +96,7 @@ static camera_config_t build_config(const cam_mode_t& mode) {
 
 static bool ensure_camera_mode(const cam_mode_t& mode) {
     if (mode == current_mode) return true;
-    esp_camera_deinit();
+    if (current_mode != MODE_NONE) esp_camera_deinit();
 
     camera_config_t config = build_config(mode);
     esp_err_t err = esp_camera_init(&config);
@@ -123,6 +122,50 @@ static void send_busy(httpd_req_t* req) {
     httpd_resp_send(req, "Camera busy, try again", HTTPD_RESP_USE_STRLEN);
 }
 
+static void log_psram(const char* label) {
+    Serial.printf("%s -- free PSRAM: %u bytes, largest free block: %u bytes\n", label,
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+}
+
+struct frame_result_t {
+    camera_fb_t* raw_data;
+    uint8_t* data;
+    size_t len;
+};
+
+static bool capture(frame_result_t& result, uint8_t quality) {
+    result.raw_data = esp_camera_fb_get();
+    result.data = NULL;
+    result.len = 0;
+
+    if (!result.raw_data) {
+        Serial.println("Camera capture failed");
+        return false;
+    }
+
+    // TODO: needs to be done only if raw_data pixfmt is not JPEG
+    bool converted = frame2jpg(result.raw_data, quality, &result.data, &result.len);
+
+    esp_camera_fb_return(result.raw_data);
+    result.raw_data = NULL;
+
+    if (!converted) {
+        Serial.println("JPEG compression failed");
+        return false;
+    }
+
+    return true;
+}
+
+static void release_frame(frame_result_t& result) {
+    if (result.raw_data) {
+        esp_camera_fb_return(result.raw_data);
+    } else if (result.data) {
+        free(result.data);
+    }
+}
+
 static esp_err_t stream_handler(httpd_req_t* req) {
     cam_mode_t* mode = (cam_mode_t*)req->user_ctx;
 
@@ -145,42 +188,21 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     char part_buf[64];
 
     while (true) {
-        camera_fb_t* fb = esp_camera_fb_get();
-        uint8_t* jpg_buf = NULL;
-        size_t jpg_buf_len = 0;
-
-        if (!fb) {
-            Serial.println("Camera capture failed");
-            res = ESP_FAIL;
-        } else if (fb->format != PIXFORMAT_JPEG) {
-            bool converted = frame2jpg(fb, 80, &jpg_buf, &jpg_buf_len);
-            esp_camera_fb_return(fb);
-            fb = NULL;
-            if (!converted) {
-                Serial.println("JPEG compression failed");
-                res = ESP_FAIL;
-            }
-        } else {
-            jpg_buf_len = fb->len;
-            jpg_buf = fb->buf;
-        }
+        frame_result_t frame;
+        res = capture(frame, mode->quality);
 
         if (res == ESP_OK) {
-            size_t hlen = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, jpg_buf_len);
+            size_t hlen = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, frame.len);
             res = httpd_resp_send_chunk(req, part_buf, hlen);
         }
         if (res == ESP_OK) {
-            res = httpd_resp_send_chunk(req, (const char*)jpg_buf, jpg_buf_len);
+            res = httpd_resp_send_chunk(req, (const char*)frame.data, frame.len);
         }
         if (res == ESP_OK) {
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
         }
 
-        if (fb) {
-            esp_camera_fb_return(fb);
-        } else if (jpg_buf) {
-            free(jpg_buf);
-        }
+        release_frame(frame);
 
         if (res != ESP_OK) {
             break;
@@ -204,45 +226,24 @@ static esp_err_t photo_handler(httpd_req_t* req) {
         return ESP_FAIL;
     }
 
-    esp_err_t res = httpd_resp_set_type(req, "image/jpeg");
-    if (res != ESP_OK) {
-        release_camera();
-        return res;
-    }
+    log_psram("before capture");
 
-    camera_fb_t* fb = esp_camera_fb_get();
-    uint8_t* jpg_buf = NULL;
-    size_t jpg_buf_len = 0;
-
-    if (!fb) {
+    frame_result_t frame;
+    if (!capture(frame, mode->quality)) {
         release_camera();
-        Serial.println("Camera capture failed");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Capture failed");
-        res = ESP_FAIL;
-    } else if (fb->format != PIXFORMAT_JPEG) {
-        bool converted = frame2jpg(fb, 80, &jpg_buf, &jpg_buf_len);
-        esp_camera_fb_return(fb);
-        fb = NULL;
-        if (!converted) {
-            Serial.println("JPEG compression failed");
-            res = ESP_FAIL;
-        }
-    } else {
-        jpg_buf_len = fb->len;
-        jpg_buf = fb->buf;
+        return ESP_FAIL;
     }
 
-    if (res == ESP_OK) {
-        res = httpd_resp_send(req, (const char*)jpg_buf, jpg_buf_len);
-    }
+    log_psram("after capture");
+    Serial.printf("JPEG size: %u bytes\n", (unsigned)frame.len);
 
-    if (fb) {
-        esp_camera_fb_return(fb);
-    } else if (jpg_buf) {
-        free(jpg_buf);
-    }
+    httpd_resp_set_type(req, "image/jpeg");
+    esp_err_t res = httpd_resp_send(req, (const char*)frame.data, frame.len);
 
+    release_frame(frame);
     release_camera();
+
     return res;
 }
 
@@ -272,10 +273,10 @@ void startCameraServer() {
         return;
     }
 
-    httpd_uri_t stream_uri = {"/stream", HTTP_GET, stream_handler, &MODE_STREAM_QVGA};
-    httpd_uri_t stream_hd_uri = {"/stream_hd", HTTP_GET, stream_handler, &MODE_STREAM_HVGA};
-    httpd_uri_t photo_uri = {"/photo", HTTP_GET, photo_handler, &MODE_PHOTO_SXGA};
-    httpd_uri_t photo_hd_uri = {"/photo_hd", HTTP_GET, photo_handler, &MODE_PHOTO_UXGA};
+    httpd_uri_t stream_uri = {"/stream", HTTP_GET, stream_handler, &MODE_STREAM_MEDIUM};
+    httpd_uri_t stream_hd_uri = {"/stream_hd", HTTP_GET, stream_handler, &MODE_STREAM_HIGH};
+    httpd_uri_t photo_uri = {"/photo", HTTP_GET, photo_handler, &MODE_PHOTO_MEDIUM};
+    httpd_uri_t photo_hd_uri = {"/photo_hd", HTTP_GET, photo_handler, &MODE_PHOTO_HIGH};
 
     httpd_register_uri_handler(camera_server, &stream_uri);
     httpd_register_uri_handler(camera_server, &stream_hd_uri);
@@ -293,7 +294,7 @@ void setup() {
 
     camera_mutex = xSemaphoreCreateMutex();
 
-    if (!ensure_camera_mode(MODE_STREAM_QVGA)) {
+    if (!ensure_camera_mode(MODE_STREAM_MEDIUM)) {
         Serial.println("Initial camera init failed -- check wiring");
         return;
     }
