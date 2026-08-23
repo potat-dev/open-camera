@@ -128,6 +128,8 @@ static void log_psram(const char* label) {
                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
 }
 
+// --- Camera Feed Stream ---
+
 struct frame_result_t {
     camera_fb_t* raw_data;
     uint8_t* data;
@@ -165,8 +167,6 @@ static void release_frame(frame_result_t& result) {
         free(result.data);
     }
 }
-
-// --- Camera Feed Stream ---
 
 static esp_err_t stream_handler(httpd_req_t* req) {
     cam_mode_t* mode = (cam_mode_t*)req->user_ctx;
@@ -215,16 +215,27 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 
 // --- Single Photo Capture ---
 
-struct photo_chunk_ctx_t {
-    httpd_req_t* req;
-    size_t total_len;
+struct photo_buffer_ctx_t {
+    uint8_t* data;
+    size_t len;
+    size_t capacity;
 };
 
-static size_t send_photo_chunk(void* arg, size_t index, const void* data, size_t len) {
-    photo_chunk_ctx_t* ctx = (photo_chunk_ctx_t*)arg;
-    if (index == 0) ctx->total_len = 0;
-    if (httpd_resp_send_chunk(ctx->req, (const char*)data, len) != ESP_OK) return 0;
-    ctx->total_len += len;
+static size_t append_photo_chunk(void* arg, size_t index, const void* data, size_t len) {
+    photo_buffer_ctx_t* ctx = (photo_buffer_ctx_t*)arg;
+    if (index == 0) ctx->len = 0;
+
+    if (ctx->len + len > ctx->capacity) {
+        size_t new_capacity = ctx->capacity ? ctx->capacity * 2 : 32768;
+        while (new_capacity < ctx->len + len) new_capacity *= 2;
+        uint8_t* new_data = (uint8_t*)heap_caps_realloc(ctx->data, new_capacity, MALLOC_CAP_SPIRAM);
+        if (!new_data) return 0;
+        ctx->data = new_data;
+        ctx->capacity = new_capacity;
+    }
+
+    memcpy(ctx->data + ctx->len, data, len);
+    ctx->len += len;
     return len;
 }
 
@@ -242,12 +253,6 @@ static esp_err_t photo_handler(httpd_req_t* req) {
         return ESP_FAIL;
     }
 
-    esp_err_t res = httpd_resp_set_type(req, "image/jpeg");
-    if (res != ESP_OK) {
-        release_camera();
-        return res;
-    }
-
     log_psram("before capture");
 
     camera_fb_t* fb = esp_camera_fb_get();
@@ -259,19 +264,25 @@ static esp_err_t photo_handler(httpd_req_t* req) {
         return ESP_FAIL;
     }
 
-    photo_chunk_ctx_t ctx = {req, 0};
-    bool ok = frame2jpg_cb(fb, mode->quality, send_photo_chunk, &ctx);
+    photo_buffer_ctx_t ctx = {NULL, 0, 0};
+    bool ok = frame2jpg_cb(fb, mode->quality, append_photo_chunk, &ctx);
     esp_camera_fb_return(fb);
 
-    if (!ok) {
-        Serial.println("JPEG encode/send failed");
-        res = ESP_FAIL;
+    log_psram("after capture");
+
+    esp_err_t res;
+    if (ok && ctx.data) {
+        Serial.printf("JPEG size: %u bytes\n", (unsigned)ctx.len);
+        httpd_resp_set_type(req, "image/jpeg");
+        res = httpd_resp_send(req, (const char*)ctx.data, ctx.len);
     } else {
-        Serial.printf("JPEG size: %u bytes\n", (unsigned)ctx.total_len);
-        res = httpd_resp_send_chunk(req, NULL, 0);  // required to terminate a chunked response
+        Serial.println("JPEG encode/send failed");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Encode failed");
+        res = ESP_FAIL;
     }
 
-    log_psram("after capture");
+    if (ctx.data) free(ctx.data);
+    log_psram("after send and cleanup");
 
     release_camera();
     return res;
@@ -297,6 +308,7 @@ void startCameraServer() {
 
     config.server_port = 80;
     config.max_uri_handlers = 8;
+    config.stack_size = 10240;
 
     if (httpd_start(&camera_server, &config) != ESP_OK) {
         Serial.println("Failed to start HTTP server");
@@ -324,7 +336,7 @@ void setup() {
 
     camera_mutex = xSemaphoreCreateMutex();
 
-    if (!ensure_camera_mode(MODE_STREAM_MEDIUM)) {
+    if (!ensure_camera_mode(MODE_PHOTO_HIGH)) {
         Serial.println("Initial camera init failed -- check wiring");
         return;
     }
