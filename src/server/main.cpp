@@ -41,11 +41,18 @@ httpd_handle_t camera_server = NULL;
 
 static SemaphoreHandle_t camera_mutex;
 
+// operating modes
+
 struct cam_mode_t {
     framesize_t framesize;
-    pixformat_t pixformat;  // can be RGB565 or YUV422, never JPEG
+    pixformat_t pixformat;
+    // pixformat can be RGB565 or YUV422, or even JPEG
+    // but only in some manual override mode when user applies no circuit bending
+
     size_t fb_count;
-    uint8_t quality;  // for frame2jpg
+    uint8_t quality;
+    // for frame2jpg conversion in RGB565 or YUV422 mode
+    // or for native JPEG quality in JPEG pixformat
 
     bool operator==(const cam_mode_t&) const = default;
 };
@@ -58,6 +65,8 @@ static cam_mode_t MODE_PHOTO_HIGH = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1, 85};
 static cam_mode_t MODE_NONE = {FRAMESIZE_INVALID, PIXFORMAT_RAW, 0, 0};
 
 static cam_mode_t current_mode = MODE_NONE;
+
+// camera configuration
 
 static camera_config_t build_config(const cam_mode_t& mode) {
     camera_config_t config = {};
