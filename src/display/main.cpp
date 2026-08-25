@@ -35,7 +35,15 @@
 #define BTN_GPIO 16
 
 #define COUNTDOWN_TICK_COUNT 3
-#define COUNTDOWN_TICK_TIME  500
+#define COUNTDOWN_TICK_TIME  750
+
+enum State {
+    VIEWFINDER,
+    COUNTDOWN,
+    PICTURE,
+};
+
+static State state = VIEWFINDER;
 
 class LGFX : public lgfx::LGFX_Device {
     lgfx::Panel_ST7789 _panel_instance;
@@ -140,25 +148,7 @@ void setup() {
     canvas.setTextDatum(lgfx::middle_center);
 }
 
-void loop() {
-    btn.tick();
-
-    if (btn.click()) {
-        if (shot) {
-            shot = false;
-        } else {
-            countdown = COUNTDOWN_TICK_COUNT;
-            countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
-        }
-    }
-
-    if (countdown > 0 && countdown_tmr < millis()) {
-        countdown_tmr += COUNTDOWN_TICK_TIME;
-        countdown -= 1;
-    }
-
-    if (shot) return;
-
+void capture() {
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) {
         Serial.println("Capture failed");
@@ -166,15 +156,48 @@ void loop() {
     }
 
     canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
-
     esp_camera_fb_return(fb);
 
     if (countdown > 0) canvas.drawNumber(countdown, 320 / 2, 240 / 2);
 
     canvas.pushSprite(0, 0);
+}
 
-    if (countdown == 0) {
-        countdown = -1;
-        shot = true;
-    };
+void loop() {
+    btn.tick();
+
+    switch (state) {
+        case VIEWFINDER:
+            if (btn.click()) {
+                state = COUNTDOWN;
+                countdown = COUNTDOWN_TICK_COUNT;
+                countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
+                break;
+            }
+
+            capture();
+            break;
+
+        case COUNTDOWN:
+            if (btn.click()) {
+                state = VIEWFINDER;
+                countdown = 0;
+                break;
+            }
+
+            if (countdown && countdown_tmr < millis()) {
+                if (--countdown) {
+                    countdown_tmr += COUNTDOWN_TICK_TIME;
+                } else {
+                    state = PICTURE;
+                }
+            }
+
+            capture();
+            break;
+
+        case PICTURE:
+            if (btn.click()) state = VIEWFINDER;
+            break;
+    }
 }
