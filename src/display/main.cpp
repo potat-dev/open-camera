@@ -113,7 +113,8 @@ void setup() {
 
     lcd.init();
     lcd.setRotation(1);  // landscape -- matches the camera's 320x240 orientation
-    // lcd.setSwapBytes(false);  // esp32-camera's RGB565 byte order commonly needs this
+    lcd.setColorDepth(16);
+    // lcd.setSwapBytes(true);  // esp32-camera's RGB565 byte order commonly needs this
     // lcd.setTextDatum(lgfx::middle_center);
     // lcd.setTextColor(TFT_WHITE);
     lcd.setTextSize(6);  // large, blocky digits -- fits the retro look
@@ -124,53 +125,72 @@ void setup() {
     Serial.println("Streaming to lcd...");
 }
 
-// void loop() {
-//     camera_fb_t* fb = esp_camera_fb_get();
-//     if (!fb) return;
+void loop() {
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) {
+        Serial.println("NO fb, exit");
+        return;
+    };
 
-//     uint16_t* px = (uint16_t*)fb->buf;
+    uint16_t* px = (uint16_t*)fb->buf;
 
-//     // Retro viewfinder frame: semi-transparent border + corner "dots".
-//     // blend_rect(px, fb->width, fb->height, 10, 10, fb->width - 20, fb->height - 20);
-//     // blend_circle(px, fb->width, fb->height, 20, 20, 8);
-//     // blend_circle(px, fb->width, fb->height, fb->width - 20, 20, 8);
+    // Retro viewfinder frame: semi-transparent border + corner "dots".
+    // blend_rect(px, fb->width, fb->height, 10, 10, fb->width - 20, fb->height - 20);
+    // blend_circle(px, fb->width, fb->height, 20, 20, 8);
+    // blend_circle(px, fb->width, fb->height, fb->width - 20, 20, 8);
 
-//     lcd.pushImage(0, 0, fb->width, fb->height, px);
-//     esp_camera_fb_return(fb);
-
-//     // Countdown, redrawn full-opacity on top of the live frame every loop --
-//     // adjust the trigger/reset logic here to whatever your shutter flow needs.
-//     static uint32_t last_tick = 0;
-//     static int count = 10;
-//     if (millis() - last_tick > 1000) {
-//         last_tick = millis();
-//         count = (count <= 0) ? 10 : count - 1;
-//     }
-//     lcd.drawNumber(count, lcd.width() / 2, lcd.height() / 2);
-// }
-
-uint32_t count = ~0;
-void loop(void) {
     lcd.startWrite();
-    //   lcd.setRotation(++count & 7);
-    //   lcd.setColorDepth((count & 8) ? 16 : 24);
-    lcd.fillScreen(TFT_BLACK);
 
-    lcd.drawNumber(++count, 100, 100);
+    int len = fb->width * fb->height;
+    Serial.print("width: ");
+    Serial.print(fb->width);
+    Serial.print(" height:");
+    Serial.print(fb->height);
+    Serial.print(" len:");
+    Serial.println(len);
 
-    // lcd.setTextColor(0xFF0000U);
-    // lcd.drawString("R", 30, 16);
-    // lcd.setTextColor(0x00FF00U);
-    // lcd.drawString("G", 40, 16);
-    // lcd.setTextColor(0x0000FFU);
-    // lcd.drawString("B", 50, 16);
+    // 画像の幅と高さをsetAddrWindowで事前に設定し、writePixelsで描画します。
+    lcd.setAddrWindow(0, 0, fb->width, fb->height);  // 描画範囲を設定。
+    lcd.writePixels(px, len);                        // RGB565の16bit画像データを描画。
 
-    // lcd.drawRect(30, 30, lcd.width() - 60, lcd.height() - 60, count * 7);
-    // lcd.drawFastHLine(0, 0, 10);
+    // lcd.pushImage(0, 0, fb->width, fb->height, px);
+    esp_camera_fb_return(fb);
 
     lcd.endWrite();
-    delay(100);
+
+    // // Countdown, redrawn full-opacity on top of the live frame every loop --
+    // // adjust the trigger/reset logic here to whatever your shutter flow needs.
+    // static uint32_t last_tick = 0;
+    // static int count = 10;
+    // if (millis() - last_tick > 1000) {
+    //     last_tick = millis();
+    //     count = (count <= 0) ? 10 : count - 1;
+    // }
+    // lcd.drawNumber(count, lcd.width() / 2, lcd.height() / 2);
 }
+
+// uint32_t count = ~0;
+// void loop(void) {
+//     lcd.startWrite();
+//     //   lcd.setRotation(++count & 7);
+//     //   lcd.setColorDepth((count & 8) ? 16 : 24);
+//     lcd.fillScreen(TFT_BLACK);
+
+//     lcd.drawNumber(++count, 100, 100);
+
+//     // lcd.setTextColor(0xFF0000U);
+//     // lcd.drawString("R", 30, 16);
+//     // lcd.setTextColor(0x00FF00U);
+//     // lcd.drawString("G", 40, 16);
+//     // lcd.setTextColor(0x0000FFU);
+//     // lcd.drawString("B", 50, 16);
+
+//     // lcd.drawRect(30, 30, lcd.width() - 60, lcd.height() - 60, count * 7);
+//     // lcd.drawFastHLine(0, 0, 10);
+
+//     lcd.endWrite();
+//     delay(100);
+// }
 
 // ---
 
