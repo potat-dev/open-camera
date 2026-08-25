@@ -31,12 +31,15 @@
 
 #define CLOCK_FREQUENCY 20000000
 
-#define TFT_SCK  39  // SCL on the board's silkscreen
-#define TFT_MOSI 40  // SDA on the board's silkscreen
+#define TFT_SCK  39  // SCL
+#define TFT_MOSI 40  // SDA
 #define TFT_DC   41
 #define TFT_CS   42
 
 #define BTN_GPIO 16
+
+#define COUNTDOWN_TICK_COUNT 3
+#define COUNTDOWN_TICK_TIME  500
 
 class LGFX : public lgfx::LGFX_Device {
     lgfx::Panel_ST7789 _panel_instance;
@@ -79,7 +82,7 @@ LGFX lcd;
 Button btn(BTN_GPIO);
 
 static bool shot = false;
-static uint8_t countdown = 0;
+static int8_t countdown = -1;
 static uint32_t countdown_tmr = 0;
 
 void setup() {
@@ -126,7 +129,7 @@ void setup() {
     lcd.setColorDepth(16);
     lcd.setSwapBytes(false);  // RGB565 byte order
 
-    lcd.setTextSize(6);  // large blocky digits
+    lcd.setTextSize(12);  // large blocky digits
     lcd.setTextColor(TFT_WHITE);
     lcd.setTextDatum(lgfx::middle_center);
 
@@ -140,22 +143,21 @@ void loop() {
         if (shot) {
             shot = false;
         } else {
-            countdown = 3;
-            countdown_tmr = millis() + 750;
+            countdown = COUNTDOWN_TICK_COUNT;
+            countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
         }
     }
 
-    if (countdown && countdown_tmr < millis()) {
-        countdown_tmr += 750;
+    if (countdown > 0 && countdown_tmr < millis()) {
+        countdown_tmr += COUNTDOWN_TICK_TIME;
         countdown -= 1;
-        if (countdown == 0) shot = true;
     }
 
     if (shot) return;
 
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) {
-        Serial.println("NO fb, exit");
+        Serial.println("Capture failed");
         return;
     }
 
@@ -164,7 +166,12 @@ void loop() {
     lcd.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
     esp_camera_fb_return(fb);
 
-    if (countdown) lcd.drawNumber(countdown, 320 / 2, 240 / 2);
+    if (countdown > 0) lcd.drawNumber(countdown, 320 / 2, 240 / 2);
 
     lcd.endWrite();
+
+    if (countdown == 0) {
+        countdown = -1;
+        shot = true;
+    };
 }
