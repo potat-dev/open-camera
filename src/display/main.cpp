@@ -7,10 +7,6 @@
 #include "esp_timer.h"
 #include "fb_gfx.h"
 #include "img_converters.h"
-#include "soc/rtc_cntl_reg.h"  //disable brownout problems
-#include "soc/soc.h"           //disable brownout problems
-
-// #include "dl_lib.h"
 
 #define NOT_CONNECTED -1
 
@@ -47,33 +43,38 @@ class LGFX : public lgfx::LGFX_Device {
 
    public:
     LGFX(void) {
-        auto cfg = _bus_instance.config();
-        cfg.spi_host = SPI2_HOST;
-        cfg.spi_mode = 0;
-        cfg.freq_write = 80000000;  // 40MHz -- safe default for jumper wires (maybe 60-80MHz)
-        // cfg.freq_write = 1000000;  // 40MHz -- safe default for jumper wires (maybe 60-80MHz)
-        cfg.freq_read = 16000000;
-        // cfg.freq_read = 1000000;
-        cfg.spi_3wire = true;  // no MISO on this board
-        cfg.use_lock = true;
-        cfg.dma_channel = SPI_DMA_CH_AUTO;  // <-- this is what enables DMA transfers
-        cfg.pin_sclk = TFT_SCK;
-        cfg.pin_mosi = TFT_MOSI;
-        cfg.pin_miso = -1;  // not connected
-        cfg.pin_dc = TFT_DC;
-        _bus_instance.config(cfg);
+        auto bus = _bus_instance.config();
+
+        bus.pin_dc = TFT_DC;
+        bus.pin_sclk = TFT_SCK;
+        bus.pin_mosi = TFT_MOSI;
+
+        bus.pin_miso = NOT_CONNECTED;
+        bus.spi_3wire = true;  // no MISO on this board
+
+        bus.freq_write = 80000000;
+        bus.freq_read = 16000000;
+
+        bus.spi_mode = 0;
+        bus.use_lock = true;
+        bus.spi_host = SPI2_HOST;
+        bus.dma_channel = SPI_DMA_CH_AUTO;  // enable DMA transfers
+
+        _bus_instance.config(bus);
         _panel_instance.setBus(&_bus_instance);
 
-        auto pcfg = _panel_instance.config();
-        pcfg.pin_cs = TFT_CS;
-        pcfg.pin_rst = -1;
-        pcfg.pin_busy = -1;
-        pcfg.panel_width = 240;  // physical panel is 240 wide x 320 tall (portrait)
-        pcfg.panel_height = 320;
-        pcfg.offset_rotation = 0;
-        pcfg.invert = true;
-        _panel_instance.config(pcfg);
+        auto panel = _panel_instance.config();
 
+        panel.pin_cs = TFT_CS;
+        panel.pin_rst = NOT_CONNECTED;
+        panel.pin_busy = NOT_CONNECTED;
+
+        panel.invert = true;      // invert colors
+        panel.panel_width = 240;  // physical panel is 240 wide x 320 tall (portrait)
+        panel.panel_height = 320;
+        panel.offset_rotation = 0;
+
+        _panel_instance.config(panel);
         setPanel(&_panel_instance);
     }
 };
