@@ -1,3 +1,5 @@
+#include <EncButton.h>
+
 #include <LovyanGFX.hpp>
 
 #include "Arduino.h"
@@ -33,6 +35,8 @@
 #define TFT_MOSI 40  // SDA on the board's silkscreen
 #define TFT_DC   41
 #define TFT_CS   42
+
+#define BTN_GPIO 16
 
 class LGFX : public lgfx::LGFX_Device {
     lgfx::Panel_ST7789 _panel_instance;
@@ -72,6 +76,11 @@ class LGFX : public lgfx::LGFX_Device {
 };
 
 LGFX lcd;
+Button btn(BTN_GPIO);
+
+static bool shot = false;
+static uint8_t countdown = 0;
+static uint32_t countdown_tmr = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -118,30 +127,44 @@ void setup() {
     lcd.setSwapBytes(false);  // RGB565 byte order
 
     lcd.setTextSize(6);  // large blocky digits
-    // lcd.setTextDatum(lgfx::middle_center);
+    lcd.setTextColor(TFT_WHITE);
+    lcd.setTextDatum(lgfx::middle_center);
+
     // lcd.fillScreen(TFT_BLACK);
-    // lcd.setTextColor(TFT_WHITE);
 }
 
 void loop() {
+    btn.tick();
+
+    if (btn.click()) {
+        if (shot) {
+            shot = false;
+        } else {
+            countdown = 3;
+            countdown_tmr = millis() + 750;
+        }
+    }
+
+    if (countdown && countdown_tmr < millis()) {
+        countdown_tmr += 750;
+        countdown -= 1;
+        if (countdown == 0) shot = true;
+    }
+
+    if (shot) return;
+
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) {
         Serial.println("NO fb, exit");
         return;
     }
 
-    uint16_t* px = (uint16_t*)fb->buf;
-
     lcd.startWrite();
 
-    int len = fb->width * fb->height;
-
-    // lcd.setAddrWindow(0, 0, fb->width, fb->height);
-    // lcd.writePixels(px, len);
-
-    lcd.pushImage(0, 0, fb->width, fb->height, px);
-
+    lcd.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
     esp_camera_fb_return(fb);
+
+    if (countdown) lcd.drawNumber(countdown, 320 / 2, 240 / 2);
 
     lcd.endWrite();
 }
