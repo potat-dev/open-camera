@@ -79,6 +79,8 @@ class LGFX : public lgfx::LGFX_Device {
 };
 
 LGFX lcd;
+LGFX_Sprite canvas(&lcd);
+
 Button btn(BTN_GPIO);
 
 static bool shot = false;
@@ -125,15 +127,16 @@ void setup() {
 
     lcd.init();
 
-    lcd.setRotation(1);  // landscape
-    lcd.setColorDepth(16);
+    lcd.setRotation(1);       // landscape
     lcd.setSwapBytes(false);  // RGB565 byte order
 
-    lcd.setTextSize(12);  // large blocky digits
-    lcd.setTextColor(TFT_WHITE);
-    lcd.setTextDatum(lgfx::middle_center);
+    canvas.setPsram(true);
+    canvas.setColorDepth(16);
+    canvas.createSprite(320, 240);
 
-    // lcd.fillScreen(TFT_BLACK);
+    canvas.setTextSize(12);  // large blocky digits
+    canvas.setTextColor(TFT_WHITE);
+    canvas.setTextDatum(lgfx::middle_center);
 }
 
 void loop() {
@@ -161,14 +164,13 @@ void loop() {
         return;
     }
 
-    lcd.startWrite();
+    canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
 
-    lcd.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
     esp_camera_fb_return(fb);
 
-    if (countdown > 0) lcd.drawNumber(countdown, 320 / 2, 240 / 2);
+    if (countdown > 0) canvas.drawNumber(countdown, 320 / 2, 240 / 2);
 
-    lcd.endWrite();
+    canvas.pushSprite(0, 0);
 
     if (countdown == 0) {
         countdown = -1;
