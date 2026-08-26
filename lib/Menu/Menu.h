@@ -113,8 +113,8 @@ class Menu {
             it.value = (it.value + dir + it.optionCount) % it.optionCount;
         } else if (it.type == MENU_INTEGER) {
             it.value += dir * it.step;
-            if (it.value < it.minValue) it.value = it.minValue;
-            if (it.value > it.maxValue) it.value = it.maxValue;
+            if (it.value < it.minValue) it.value = it.maxValue;
+            if (it.value > it.maxValue) it.value = it.minValue;
         } else if (it.type == MENU_TOGGLE && dir) {
             it.value = !it.value;
         }
