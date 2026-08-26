@@ -1,6 +1,6 @@
 #include <EncButton.h>
-
-#include <LovyanGFX.hpp>
+#include <LovyanGFX.h>
+#include <Menu.h>
 
 #include "Arduino.h"
 #include "esp_camera.h"
@@ -39,6 +39,7 @@
 
 enum State {
     VIEWFINDER,
+    SETTINGS,
     COUNTDOWN,
     PICTURE,
 };
@@ -92,6 +93,16 @@ LGFX_Sprite canvas(&lcd);
 
 Button btn(BTN_GPIO);
 
+const char* modeOptions[] = {"Auto", "Manual", "Expert"};
+MenuItem menuItems[4] = {
+    {"Demo", MENU_TOGGLE, 0},
+    {"Mode", MENU_SELECT, 0, modeOptions, 3},
+    {"Value", MENU_INTEGER, 50, nullptr, 0, 0, 100, 5},
+    {"Exit", MENU_EXIT},
+};
+
+Menu menu(menuItems, 4);
+
 static bool shot = false;
 static int8_t countdown = -1;
 static uint32_t countdown_tmr = 0;
@@ -144,8 +155,6 @@ void setup() {
     canvas.createSprite(320, 240);
 
     canvas.setTextSize(4);
-    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
-    canvas.setTextDatum(lgfx::baseline_center);
 }
 
 void capture() {
@@ -157,15 +166,9 @@ void capture() {
 
     canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
     esp_camera_fb_return(fb);
-
-    if (countdown > 0) {
-        char buf[12];
-        sprintf(buf, "Shot in %d", countdown);
-        canvas.drawString(buf, 320 / 2, 240 - 24);
-    }
-
-    canvas.pushSprite(0, 0);
 }
+
+void display() { canvas.pushSprite(0, 0); }
 
 void loop() {
     btn.tick();
@@ -179,7 +182,26 @@ void loop() {
                 break;
             }
 
+            if (btn.hold()) {
+                state = SETTINGS;
+                break;
+            }
+
             capture();
+            display();
+            break;
+
+        case SETTINGS:
+            if (btn.click()) menu.clickHandler();
+            if (btn.hold()) menu.holdHandler();
+            if (menu.wantsExit()) {
+                state = VIEWFINDER;
+                break;
+            }
+
+            capture();
+            menu.draw(canvas, 16, 16, 320 - 32, 240 - 32, 3);
+            display();
             break;
 
         case COUNTDOWN:
@@ -198,6 +220,17 @@ void loop() {
             }
 
             capture();
+
+            if (countdown > 0) {
+                char buf[12];
+                sprintf(buf, "Shot in %d", countdown);
+                canvas.setTextSize(4);
+                canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+                canvas.setTextDatum(lgfx::baseline_center);
+                canvas.drawString(buf, 320 / 2, 240 - 24);
+            }
+
+            display();
             break;
 
         case PICTURE:

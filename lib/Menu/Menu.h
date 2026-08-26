@@ -1,0 +1,137 @@
+#pragma once
+
+#include <LovyanGFX.hpp>
+
+enum MenuItemType : uint8_t {
+    MENU_TOGGLE,
+    MENU_SELECT,
+    MENU_INTEGER,
+    MENU_EXIT,
+};
+
+struct MenuItem {
+    const char* name;
+    MenuItemType type;
+
+    // Current value. Meaning depends on type:
+    //   MENU_TOGGLE:  0 or 1
+    //   MENU_SELECT:  index into `options`
+    //   MENU_INTEGER: the raw value
+    int value = 0;
+
+    // MENU_SELECT only
+    const char* const* options = nullptr;
+    uint8_t optionCount = 0;
+
+    // MENU_INTEGER only
+    int minValue = 0;
+    int maxValue = 0;
+    int step = 1;
+};
+
+class Menu {
+   public:
+    Menu(MenuItem* items, uint8_t count) : _items(items), _count(count) {}
+
+    void clickHandler() { _editing ? editValue(+1) : moveFocus(+1); }
+
+    void holdHandler() {
+        MenuItem& it = _items[_focus];
+        if (_editing) {
+            _editing = false;
+        } else {
+            if (it.type == MENU_EXIT) {
+                _exitRequested = true;
+                _focus = 0;
+            } else {
+                _editing = true;
+            }
+        }
+    }
+
+    bool wantsExit() {
+        bool r = _exitRequested;
+        _exitRequested = false;
+        return r;
+    }
+
+    void draw(LGFX_Sprite& canvas, int x, int y, int w, int h, int textSize) {
+        canvas.setTextSize(textSize);
+        int rowHeight = canvas.fontHeight() + 8;
+        int visibleRows = h / rowHeight;
+
+        int scroll = 0;
+        if ((int)_focus >= visibleRows) scroll = _focus - visibleRows + 1;
+        int maxScroll = (int)_count - visibleRows;
+        if (maxScroll < 0) maxScroll = 0;
+        if (scroll > maxScroll) scroll = maxScroll;
+
+        for (int row = 0; row < visibleRows; row++) {
+            int i = scroll + row;
+            if (i >= (int)_count) break;
+
+            int rowY = y + row * rowHeight;
+            bool focused = (i == _focus);
+
+            if (focused) {
+                canvas.fillRect(x, rowY, w, rowHeight, _editing ? TFT_DARKGREEN : TFT_NAVY);
+            }
+
+            canvas.setTextDatum(lgfx::middle_left);
+            canvas.setTextColor(TFT_WHITE);
+            canvas.drawString(_items[i].name, x + 6, rowY + rowHeight / 2);
+
+            char valueStr[24];
+            formatValue(_items[i], valueStr, sizeof(valueStr));
+            canvas.setTextDatum(lgfx::middle_right);
+            canvas.drawString(valueStr, x + w - 6, rowY + rowHeight / 2);
+        }
+    }
+
+   private:
+    MenuItem* _items;
+    uint8_t _count;
+    uint8_t _focus = 0;
+    bool _editing = false;
+    int _editBackup = 0;
+    bool _exitRequested = false;
+
+    void moveFocus(int dir) {
+        if (_count == 0) return;
+        int next = (int)_focus + dir;
+        if (next < 0) next = _count - 1;
+        if (next >= (int)_count) next = 0;
+        _focus = (uint8_t)next;
+    }
+
+    void editValue(int dir) {
+        MenuItem& it = _items[_focus];
+        if (it.type == MENU_SELECT && it.optionCount > 0) {
+            it.value = (it.value + dir + it.optionCount) % it.optionCount;
+        } else if (it.type == MENU_INTEGER) {
+            it.value += dir * it.step;
+            if (it.value < it.minValue) it.value = it.minValue;
+            if (it.value > it.maxValue) it.value = it.maxValue;
+        } else if (it.type == MENU_TOGGLE && dir) {
+            it.value = !it.value;
+        }
+    }
+
+    static void formatValue(const MenuItem& it, char* out, size_t n) {
+        switch (it.type) {
+            case MENU_TOGGLE:
+                snprintf(out, n, "%s", it.value ? "ON" : "OFF");
+                break;
+            case MENU_SELECT:
+                snprintf(out, n, "%s",
+                         (it.options && it.value < it.optionCount) ? it.options[it.value] : "?");
+                break;
+            case MENU_INTEGER:
+                snprintf(out, n, "%d", it.value);
+                break;
+            case MENU_EXIT:
+                snprintf(out, n, ">");
+                break;
+        }
+    }
+};
