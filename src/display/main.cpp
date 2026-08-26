@@ -143,9 +143,9 @@ void setup() {
     canvas.setColorDepth(16);
     canvas.createSprite(320, 240);
 
-    canvas.setTextSize(12);  // large blocky digits
-    canvas.setTextColor(TFT_WHITE);
-    canvas.setTextDatum(lgfx::middle_center);
+    canvas.setTextSize(4);
+    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+    canvas.setTextDatum(lgfx::baseline_center);
 }
 
 void capture() {
@@ -158,7 +158,11 @@ void capture() {
     canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
     esp_camera_fb_return(fb);
 
-    if (countdown > 0) canvas.drawNumber(countdown, 320 / 2, 240 / 2);
+    if (countdown > 0) {
+        char buf[12];
+        sprintf(buf, "Shot in %d", countdown);
+        canvas.drawString(buf, 320 / 2, 240 - 24);
+    }
 
     canvas.pushSprite(0, 0);
 }
