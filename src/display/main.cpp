@@ -200,7 +200,7 @@ void loop() {
             }
 
             capture();
-            menu.draw(canvas, 16, 16, 320 - 32, 240 - 32, 3);
+            menu.draw(canvas, 16, 3);
             display();
             break;
 

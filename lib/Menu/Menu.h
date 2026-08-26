@@ -55,9 +55,12 @@ class Menu {
         return r;
     }
 
-    void draw(LGFX_Sprite& canvas, int x, int y, int w, int h, int textSize) {
+    void draw(LGFX_Sprite& canvas, int offset, int textSize = 2) {
+        int h = canvas.height() - offset * 2;
+        int w = canvas.width() - offset * 2;
+
         canvas.setTextSize(textSize);
-        int rowHeight = canvas.fontHeight() + 8;
+        int rowHeight = canvas.fontHeight() + canvas.fontHeight() / 4;
         int visibleRows = h / rowHeight;
 
         int scroll = 0;
@@ -70,21 +73,21 @@ class Menu {
             int i = scroll + row;
             if (i >= (int)_count) break;
 
-            int rowY = y + row * rowHeight;
+            int rowY = offset + row * rowHeight;
             bool focused = (i == _focus);
 
             if (focused) {
-                canvas.fillRect(x, rowY, w, rowHeight, _editing ? TFT_DARKGREEN : TFT_NAVY);
+                canvas.fillRect(offset, rowY, w, rowHeight, _editing ? TFT_DARKGREEN : TFT_NAVY);
             }
 
             canvas.setTextDatum(lgfx::middle_left);
             canvas.setTextColor(TFT_WHITE);
-            canvas.drawString(_items[i].name, x + 6, rowY + rowHeight / 2);
+            canvas.drawString(_items[i].name, offset, rowY + rowHeight / 2);
 
             char valueStr[24];
             formatValue(_items[i], valueStr, sizeof(valueStr));
             canvas.setTextDatum(lgfx::middle_right);
-            canvas.drawString(valueStr, x + w - 6, rowY + rowHeight / 2);
+            canvas.drawString(valueStr, offset + w, rowY + rowHeight / 2);
         }
     }
 
