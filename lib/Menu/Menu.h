@@ -84,10 +84,13 @@ class Menu {
 
             if (focused) {
                 canvas.fillRect(offset, rowY, w, rowHeight, _editing ? TFT_DARKGREEN : TFT_NAVY);
+                canvas.setTextColor(TFT_WHITE, _editing ? TFT_DARKGREEN : TFT_NAVY);
+                // TODO: make BG color optional
+            } else {
+                canvas.setTextColor(TFT_WHITE, TFT_BLACK);
             }
 
             canvas.setTextDatum(lgfx::middle_left);
-            canvas.setTextColor(TFT_WHITE);
             canvas.drawString(_items[i]->name, offset, rowY + rowHeight / 2);
 
             char valueStr[24];
