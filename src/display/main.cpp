@@ -94,16 +94,20 @@ LGFX_Sprite canvas(&lcd);
 Button btn(BTN_GPIO);
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
+const char* effectOptions[] = {"None", "Negative", "Gray", "Red", "Green", "Blue", "Sepia"};
 
-MenuItem menuItems[5] = {
+constexpr size_t items_count = 6;
+
+MenuItem menuItems[items_count] = {
     {"Demo", MENU_TOGGLE, 0},
     {"Mode", MENU_SELECT, 0, modeOptions, 3},
     {"Value", MENU_INTEGER, 50, nullptr, 0, 0, 100, 5},
     {"Bright", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1},
+    {"Effect", MENU_SELECT, 0, effectOptions, 7},
     {"Exit", MENU_EXIT},
 };
 
-Menu menu(menuItems, 5);
+Menu menu(menuItems, items_count);
 
 static bool shot = false;
 static int8_t countdown = -1;
@@ -164,8 +168,9 @@ static void configure_camera() {
     // s->set_hmirror(s, 1);
     // s->set_vflip(s, 1);
 
-    // // values: -2 to 2
+    // values: -2 to 2
     s->set_brightness(s, menuItems[3].value);
+
     // s->set_saturation(s, 0);
     // s->set_contrast(s, 0);
     // s->set_ae_level(s, 0);
@@ -175,9 +180,9 @@ static void configure_camera() {
     // s->set_aec_value(s, 300);               // 0 to 1200
     // s->set_agc_gain(s, 0);                  // 0 to 30
 
-    // // effects: 0 to 6
-    // // None, Negative, Gray, Red Tint, Green Tint, Blue Tint, Sepia
-    // s->set_special_effect(s, 0);
+    // effects: 0 to 6
+    // None, Negative, Gray, Red Tint, Green Tint, Blue Tint, Sepia
+    s->set_special_effect(s, menuItems[4].value);
 
     // // white balance: 0 to 4
     // // Auto, Sunny, Cloudy, Office, Home
