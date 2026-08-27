@@ -94,24 +94,24 @@ LGFX_Sprite canvas(&lcd);
 Button btn(BTN_GPIO);
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
-MenuItem menuItems[4] = {
+
+MenuItem menuItems[5] = {
     {"Demo", MENU_TOGGLE, 0},
     {"Mode", MENU_SELECT, 0, modeOptions, 3},
     {"Value", MENU_INTEGER, 50, nullptr, 0, 0, 100, 5},
+    {"Bright", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1},
     {"Exit", MENU_EXIT},
 };
 
-Menu menu(menuItems, 4);
+Menu menu(menuItems, 5);
 
 static bool shot = false;
 static int8_t countdown = -1;
 static uint32_t countdown_tmr = 0;
 
-void setup() {
-    Serial.begin(115200);
-    Serial.setDebugOutput(false);
-
+static camera_config_t get_camera_config() {
     camera_config_t config = {};
+
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer = LEDC_TIMER_0;
 
@@ -140,10 +140,60 @@ void setup() {
     config.grab_mode = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CLOCK_FREQUENCY;
 
+    return config;
+}
+
+static void configure_camera() {
+    // set sensor configs
+    sensor_t* s = esp_camera_sensor_get();
+
+    // switches
+    // s->set_exposure_ctrl(s, 1);
+    // s->set_gain_ctrl(s, 1);
+    // s->set_whitebal(s, 1);
+    // s->set_awb_gain(s, 1);
+    // s->set_colorbar(s, 0);
+    // s->set_raw_gma(s, 1);
+    // s->set_aec2(s, 0);
+    // s->set_lenc(s, 1);
+    // s->set_bpc(s, 0);
+    // s->set_wpc(s, 1);
+    // s->set_dcw(s, 1);
+
+    // // image flip
+    // s->set_hmirror(s, 1);
+    // s->set_vflip(s, 1);
+
+    // // values: -2 to 2
+    s->set_brightness(s, menuItems[3].value);
+    // s->set_saturation(s, 0);
+    // s->set_contrast(s, 0);
+    // s->set_ae_level(s, 0);
+
+    // // image correction values
+    // s->set_gainceiling(s, GAINCEILING_2X);  // 2X to 128X
+    // s->set_aec_value(s, 300);               // 0 to 1200
+    // s->set_agc_gain(s, 0);                  // 0 to 30
+
+    // // effects: 0 to 6
+    // // None, Negative, Gray, Red Tint, Green Tint, Blue Tint, Sepia
+    // s->set_special_effect(s, 0);
+
+    // // white balance: 0 to 4
+    // // Auto, Sunny, Cloudy, Office, Home
+    // s->set_wb_mode(s, 0);
+}
+
+void setup() {
+    Serial.begin(115200);
+    Serial.setDebugOutput(false);
+
+    camera_config_t config = get_camera_config();
     if (esp_camera_init(&config) != ESP_OK) {
         Serial.println("Camera init failed -- check wiring");
         return;
     }
+    configure_camera();
 
     lcd.init();
 
@@ -194,10 +244,13 @@ void loop() {
         case SETTINGS:
             if (btn.click()) menu.clickHandler();
             if (btn.hold()) menu.holdHandler();
+
             if (menu.wantsExit()) {
                 state = VIEWFINDER;
                 break;
             }
+
+            if (menu.changed()) configure_camera();
 
             capture();
             menu.draw(canvas, 16, 3);

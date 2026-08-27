@@ -55,6 +55,12 @@ class Menu {
         return r;
     }
 
+    bool changed() {
+        bool e = _changed;
+        _changed = false;
+        return e;
+    }
+
     void draw(LGFX_Sprite& canvas, int offset, int textSize = 2) {
         int h = canvas.height() - offset * 2;
         int w = canvas.width() - offset * 2;
@@ -98,6 +104,7 @@ class Menu {
     bool _editing = false;
     int _editBackup = 0;
     bool _exitRequested = false;
+    bool _changed = false;
 
     void moveFocus(int dir) {
         if (_count == 0) return;
@@ -111,12 +118,15 @@ class Menu {
         MenuItem& it = _items[_focus];
         if (it.type == MENU_SELECT && it.optionCount > 0) {
             it.value = (it.value + dir + it.optionCount) % it.optionCount;
+            _changed = true;
         } else if (it.type == MENU_INTEGER) {
             it.value += dir * it.step;
             if (it.value < it.minValue) it.value = it.maxValue;
             if (it.value > it.maxValue) it.value = it.minValue;
+            _changed = true;
         } else if (it.type == MENU_TOGGLE && dir) {
             it.value = !it.value;
+            _changed = true;
         }
     }
 
