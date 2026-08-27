@@ -31,16 +31,16 @@ struct MenuItem {
 
 class Menu {
    public:
-    Menu(MenuItem* items, uint8_t count) : _items(items), _count(count) {}
+    Menu(MenuItem** items, uint8_t count) : _items(items), _count(count) {}
 
     void clickHandler() { _editing ? editValue(+1) : moveFocus(+1); }
 
     void holdHandler() {
-        MenuItem& it = _items[_focus];
+        MenuItem* it = _items[_focus];
         if (_editing) {
             _editing = false;
         } else {
-            if (it.type == MENU_EXIT) {
+            if (it->type == MENU_EXIT) {
                 _exitRequested = true;
                 _focus = 0;
             } else {
@@ -88,7 +88,7 @@ class Menu {
 
             canvas.setTextDatum(lgfx::middle_left);
             canvas.setTextColor(TFT_WHITE);
-            canvas.drawString(_items[i].name, offset, rowY + rowHeight / 2);
+            canvas.drawString(_items[i]->name, offset, rowY + rowHeight / 2);
 
             char valueStr[24];
             formatValue(_items[i], valueStr, sizeof(valueStr));
@@ -98,7 +98,7 @@ class Menu {
     }
 
    private:
-    MenuItem* _items;
+    MenuItem** _items;
     uint8_t _count;
     uint8_t _focus = 0;
     bool _editing = false;
@@ -115,32 +115,33 @@ class Menu {
     }
 
     void editValue(int dir) {
-        MenuItem& it = _items[_focus];
-        if (it.type == MENU_SELECT && it.optionCount > 0) {
-            it.value = (it.value + dir + it.optionCount) % it.optionCount;
+        MenuItem* it = _items[_focus];
+        if (it->type == MENU_SELECT && it->optionCount > 0) {
+            it->value = (it->value + dir + it->optionCount) % it->optionCount;
             _changed = true;
-        } else if (it.type == MENU_INTEGER) {
-            it.value += dir * it.step;
-            if (it.value < it.minValue) it.value = it.maxValue;
-            if (it.value > it.maxValue) it.value = it.minValue;
+        } else if (it->type == MENU_INTEGER) {
+            it->value += dir * it->step;
+            if (it->value < it->minValue) it->value = it->maxValue;
+            if (it->value > it->maxValue) it->value = it->minValue;
             _changed = true;
-        } else if (it.type == MENU_TOGGLE && dir) {
-            it.value = !it.value;
+        } else if (it->type == MENU_TOGGLE && dir) {
+            it->value = !it->value;
             _changed = true;
         }
     }
 
-    static void formatValue(const MenuItem& it, char* out, size_t n) {
-        switch (it.type) {
+    static void formatValue(const MenuItem* it, char* out, size_t n) {
+        switch (it->type) {
             case MENU_TOGGLE:
-                snprintf(out, n, "%s", it.value ? "ON" : "OFF");
+                snprintf(out, n, "%s", it->value ? "ON" : "OFF");
                 break;
             case MENU_SELECT:
-                snprintf(out, n, "%s",
-                         (it.options && it.value < it.optionCount) ? it.options[it.value] : "?");
+                snprintf(
+                    out, n, "%s",
+                    (it->options && it->value < it->optionCount) ? it->options[it->value] : "?");
                 break;
             case MENU_INTEGER:
-                snprintf(out, n, "%d", it.value);
+                snprintf(out, n, "%d", it->value);
                 break;
             case MENU_EXIT:
                 snprintf(out, n, ">");

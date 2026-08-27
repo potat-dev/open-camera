@@ -94,17 +94,31 @@ LGFX_Sprite canvas(&lcd);
 Button btn(BTN_GPIO);
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
-const char* effectOptions[] = {"None", "Negative", "Gray", "Red", "Green", "Blue", "Sepia"};
 
-constexpr size_t items_count = 6;
+constexpr size_t items_count = 9;
 
-MenuItem menuItems[items_count] = {
-    {"Demo", MENU_TOGGLE, 0},
-    {"Mode", MENU_SELECT, 0, modeOptions, 3},
-    {"Value", MENU_INTEGER, 50, nullptr, 0, 0, 100, 5},
-    {"Bright", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1},
-    {"Effect", MENU_SELECT, 0, effectOptions, 7},
-    {"Exit", MENU_EXIT},
+MenuItem contrast = {"Contr", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
+MenuItem brightness = {"Bright", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
+MenuItem saturation = {"Satur", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
+MenuItem sharpness = {"Sharp", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
+
+const char* wbOptions[] = {"Auto", "Sunny", "Cloudy", "Office", "Home"};
+MenuItem whiteBalance = {"White", MENU_SELECT, 0, wbOptions, 5};
+
+const char* effectOptions[] = {"None", "Invert", "Gray", "Red", "Green", "Blue", "Sepia"};
+MenuItem effect = {"Effect", MENU_SELECT, 0, effectOptions, 7};
+
+MenuItem hFlip = {"Flip H", MENU_TOGGLE, 0};
+MenuItem vFlip = {"Flip V", MENU_TOGGLE, 0};
+
+MenuItem menuExit = {"Exit", MENU_EXIT};
+
+// {"Demo", MENU_TOGGLE, 0},
+// {"Mode", MENU_SELECT, 0, modeOptions, 3},
+// {"Value", MENU_INTEGER, 50, nullptr, 0, 0, 100, 5},
+MenuItem* menuItems[] = {
+    &contrast, &brightness, &saturation, &sharpness, &whiteBalance,
+    &effect,   &hFlip,      &vFlip,      &menuExit,
 };
 
 Menu menu(menuItems, items_count);
@@ -164,15 +178,15 @@ static void configure_camera() {
     // s->set_wpc(s, 1);
     // s->set_dcw(s, 1);
 
-    // // image flip
-    // s->set_hmirror(s, 1);
-    // s->set_vflip(s, 1);
+    // image flip
+    s->set_hmirror(s, hFlip.value);
+    s->set_vflip(s, vFlip.value);
 
     // values: -2 to 2
-    s->set_brightness(s, menuItems[3].value);
-
-    // s->set_saturation(s, 0);
-    // s->set_contrast(s, 0);
+    s->set_contrast(s, contrast.value);
+    s->set_brightness(s, brightness.value);
+    s->set_saturation(s, saturation.value);
+    s->set_sharpness(s, sharpness.value);
     // s->set_ae_level(s, 0);
 
     // // image correction values
@@ -182,11 +196,11 @@ static void configure_camera() {
 
     // effects: 0 to 6
     // None, Negative, Gray, Red Tint, Green Tint, Blue Tint, Sepia
-    s->set_special_effect(s, menuItems[4].value);
+    s->set_special_effect(s, effect.value);
 
-    // // white balance: 0 to 4
-    // // Auto, Sunny, Cloudy, Office, Home
-    // s->set_wb_mode(s, 0);
+    // white balance: 0 to 4
+    // Auto, Sunny, Cloudy, Office, Home
+    s->set_wb_mode(s, whiteBalance.value);
 }
 
 void setup() {
