@@ -95,8 +95,6 @@ Button btn(BTN_GPIO);
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
 
-constexpr size_t items_count = 9;
-
 MenuItem contrast = {"Contr", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
 MenuItem brightness = {"Bright", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
 MenuItem saturation = {"Satur", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
@@ -111,20 +109,17 @@ MenuItem effect = {"Effect", MENU_SELECT, 0, effectOptions, 7};
 MenuItem hFlip = {"Flip H", MENU_TOGGLE, 0};
 MenuItem vFlip = {"Flip V", MENU_TOGGLE, 0};
 
+MenuItem menuScale = {"UI Scale", MENU_INTEGER, 3, nullptr, 0, 2, 4, 1};
 MenuItem menuExit = {"Exit", MENU_EXIT};
 
-// {"Demo", MENU_TOGGLE, 0},
-// {"Mode", MENU_SELECT, 0, modeOptions, 3},
-// {"Value", MENU_INTEGER, 50, nullptr, 0, 0, 100, 5},
 MenuItem* menuItems[] = {
     &contrast, &brightness, &saturation, &sharpness, &whiteBalance,
-    &effect,   &hFlip,      &vFlip,      &menuExit,
+    &effect,   &hFlip,      &vFlip,      &menuScale, &menuExit,
 };
 
-Menu menu(menuItems, items_count);
+Menu menu(menuItems, 10);
 
-static bool shot = false;
-static int8_t countdown = -1;
+static int8_t countdown = 0;
 static uint32_t countdown_tmr = 0;
 
 static camera_config_t get_camera_config() {
@@ -272,7 +267,7 @@ void loop() {
             if (menu.changed()) configure_camera();
 
             capture();
-            menu.draw(canvas, 16, 3);
+            menu.draw(canvas, 16, menuScale.value);
             display();
             break;
 
