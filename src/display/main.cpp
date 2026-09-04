@@ -116,17 +116,30 @@ MenuItem whiteBalance = {"White", MENU_SELECT, 0, wbOptions, 5};
 const char* effectOptions[] = {"None", "Invert", "Gray", "Red", "Green", "Blue", "Sepia"};
 MenuItem effect = {"Effect", MENU_SELECT, 0, effectOptions, 7};
 
-MenuItem hFlip = {"Flip H", MENU_TOGGLE, 0};
-MenuItem vFlip = {"Flip V", MENU_TOGGLE, 0};
+MenuItem hFlip = {"FlipH", MENU_TOGGLE, 0};
+MenuItem vFlip = {"FlipV", MENU_TOGGLE, 0};
 
-MenuItem menuScale = {"UI Scale", MENU_INTEGER, 3, nullptr, 0, 2, 3, 1};
+MenuItem expCtrl = {"ExpCtrl", MENU_TOGGLE, 1};
+MenuItem gainCtrl = {"GainCtrl", MENU_TOGGLE, 1};
+MenuItem colorBar = {"ColorBar", MENU_TOGGLE, 0};
+MenuItem whiteBal = {"WhiteBal", MENU_TOGGLE, 1};
+MenuItem gainAWB = {"GainAWB", MENU_TOGGLE, 1};
+MenuItem rawGMA = {"RawGMA", MENU_TOGGLE, 1};
+MenuItem aec2 = {"AEC2", MENU_TOGGLE, 0};
+MenuItem lenc = {"LenC", MENU_TOGGLE, 1};
+MenuItem bpc = {"BPC", MENU_TOGGLE, 0};
+MenuItem wpc = {"WPC", MENU_TOGGLE, 1};
+MenuItem dcw = {"DCW", MENU_TOGGLE, 1};
+
+MenuItem menuScale = {"TextSize", MENU_INTEGER, 2, nullptr, 0, 2, 3, 1};
 
 MenuItem* menuItems[] = {
-    &contrast, &brightness, &saturation, &sharpness, &whiteBalance,
-    &effect,   &hFlip,      &vFlip,      &menuScale,
+    &contrast, &brightness, &saturation, &sharpness, &whiteBalance, &effect,    &hFlip,
+    &vFlip,    &expCtrl,    &gainCtrl,   &colorBar,  &whiteBal,     &gainAWB,   &rawGMA,
+    &aec2,     &lenc,       &bpc,        &wpc,       &dcw,          &menuScale,
 };
 
-Menu menu(menuItems, 9);
+Menu menu(menuItems, 20);
 
 static int8_t countdown = 0;
 static uint32_t countdown_tmr = 0;
@@ -170,17 +183,17 @@ static void configure_camera() {
     sensor_t* s = esp_camera_sensor_get();
 
     // switches
-    // s->set_exposure_ctrl(s, 1);
-    // s->set_gain_ctrl(s, 1);
-    // s->set_whitebal(s, 1);
-    // s->set_awb_gain(s, 1);
-    // s->set_colorbar(s, 0);
-    // s->set_raw_gma(s, 1);
-    // s->set_aec2(s, 0);
-    // s->set_lenc(s, 1);
-    // s->set_bpc(s, 0);
-    // s->set_wpc(s, 1);
-    // s->set_dcw(s, 1);
+    s->set_exposure_ctrl(s, expCtrl.value);
+    s->set_gain_ctrl(s, gainCtrl.value);
+    s->set_colorbar(s, colorBar.value);
+    s->set_whitebal(s, whiteBal.value);
+    s->set_awb_gain(s, gainAWB.value);
+    s->set_raw_gma(s, rawGMA.value);
+    s->set_aec2(s, aec2.value);
+    s->set_lenc(s, lenc.value);
+    s->set_bpc(s, bpc.value);
+    s->set_wpc(s, wpc.value);
+    s->set_dcw(s, dcw.value);
 
     // image flip
     s->set_hmirror(s, hFlip.value);
@@ -198,12 +211,7 @@ static void configure_camera() {
     // s->set_aec_value(s, 300);               // 0 to 1200
     // s->set_agc_gain(s, 0);                  // 0 to 30
 
-    // effects: 0 to 6
-    // None, Negative, Gray, Red Tint, Green Tint, Blue Tint, Sepia
     s->set_special_effect(s, effect.value);
-
-    // white balance: 0 to 4
-    // Auto, Sunny, Cloudy, Office, Home
     s->set_wb_mode(s, whiteBalance.value);
 }
 
