@@ -61,6 +61,10 @@ class LGFX : public lgfx::LGFX_Device {
         bus.pin_miso = NOT_CONNECTED;
         bus.spi_3wire = true;  // no MISO on this board
 
+        // 80MHz is crazy
+        // 40MHz is crazy
+        // 20MHz is barely fine
+        // 16MHz is great but very slow
         bus.freq_write = 80000000;
         bus.freq_read = 16000000;
 
@@ -210,6 +214,9 @@ void setup() {
     configure_camera();
 
     lcd.init();
+
+    // gpio_set_drive_capability((gpio_num_t)TFT_SCK, GPIO_DRIVE_CAP_0);
+    // gpio_set_drive_capability((gpio_num_t)TFT_MOSI, GPIO_DRIVE_CAP_0);
 
     lcd.setRotation(1);       // landscape
     lcd.setSwapBytes(false);  // RGB565 byte order
