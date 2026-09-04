@@ -178,6 +178,13 @@ static camera_config_t get_camera_config() {
     return config;
 }
 
+static void enable_sde_bits(sensor_t* s, uint8_t bits) {
+    s->set_reg(s, 0xFF, 0xFF, 0x00);
+    s->set_reg(s, 0x7C, 0xFF, 0x00);
+    int current = s->get_reg(s, 0x7D, 0xFF);
+    s->set_reg(s, 0x7D, 0xFF, current | bits);
+}
+
 static void configure_camera() {
     // set sensor configs
     sensor_t* s = esp_camera_sensor_get();
@@ -213,6 +220,8 @@ static void configure_camera() {
 
     s->set_special_effect(s, effect.value);
     s->set_wb_mode(s, whiteBalance.value);
+
+    enable_sde_bits(s, 0x07);
 }
 
 void setup() {
