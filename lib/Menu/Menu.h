@@ -6,7 +6,6 @@ enum MenuItemType : uint8_t {
     MENU_TOGGLE,
     MENU_SELECT,
     MENU_INTEGER,
-    MENU_EXIT,
 };
 
 struct MenuItem {
@@ -33,20 +32,24 @@ class Menu {
    public:
     Menu(MenuItem** items, uint8_t count) : _items(items), _count(count) {}
 
-    void clickHandler() { _editing ? editValue(+1) : moveFocus(+1); }
+    void upHandler() { _editing ? editValue(+1) : moveFocus(-1); }
+    void downHandler() { _editing ? editValue(-1) : moveFocus(+1); }
 
-    void holdHandler() {
+    void selectHandler() {
         MenuItem* it = _items[_focus];
         if (_editing) {
             _editing = false;
+        } else if (it->type == MENU_TOGGLE) {
+            editValue(+1);
         } else {
-            if (it->type == MENU_EXIT) {
-                _exitRequested = true;
-                _focus = 0;
-            } else {
-                _editing = true;
-            }
+            _editing = true;
         }
+    }
+
+    void backHandler() {
+        _exitRequested = true;
+        _editing = false;
+        _focus = 0;
     }
 
     bool wantsExit() {
@@ -145,9 +148,6 @@ class Menu {
                 break;
             case MENU_INTEGER:
                 snprintf(out, n, "%d", it->value);
-                break;
-            case MENU_EXIT:
-                snprintf(out, n, ">");
                 break;
         }
     }

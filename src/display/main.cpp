@@ -25,17 +25,20 @@
 #define D6_GPIO 13
 #define D7_GPIO 14
 
-#define CLOCK_FREQUENCY 20000000
-
 #define TFT_SCK  39  // SCL
 #define TFT_MOSI 40  // SDA
 #define TFT_DC   41
 #define TFT_CS   42
 
-#define BTN_GPIO 16
+#define S_BTN_GPIO 16  // shutter
+#define A_BTN_GPIO 21  // up
+#define B_BTN_GPIO 20  // down
+#define X_BTN_GPIO 19  // select
 
 #define COUNTDOWN_TICK_COUNT 3
 #define COUNTDOWN_TICK_TIME  750
+
+#define CLOCK_FREQUENCY 20000000
 
 enum State {
     VIEWFINDER,
@@ -95,7 +98,10 @@ class LGFX : public lgfx::LGFX_Device {
 LGFX lcd;
 LGFX_Sprite canvas(&lcd);
 
-Button btn(BTN_GPIO);
+Button btnS(S_BTN_GPIO);
+Button btnA(A_BTN_GPIO);
+Button btnB(B_BTN_GPIO);
+Button btnX(X_BTN_GPIO);
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
 
@@ -113,15 +119,14 @@ MenuItem effect = {"Effect", MENU_SELECT, 0, effectOptions, 7};
 MenuItem hFlip = {"Flip H", MENU_TOGGLE, 0};
 MenuItem vFlip = {"Flip V", MENU_TOGGLE, 0};
 
-MenuItem menuScale = {"UI Scale", MENU_INTEGER, 3, nullptr, 0, 2, 4, 1};
-MenuItem menuExit = {"Exit", MENU_EXIT};
+MenuItem menuScale = {"UI Scale", MENU_INTEGER, 3, nullptr, 0, 2, 3, 1};
 
 MenuItem* menuItems[] = {
     &contrast, &brightness, &saturation, &sharpness, &whiteBalance,
-    &effect,   &hFlip,      &vFlip,      &menuScale, &menuExit,
+    &effect,   &hFlip,      &vFlip,      &menuScale,
 };
 
-Menu menu(menuItems, 10);
+Menu menu(menuItems, 9);
 
 static int8_t countdown = 0;
 static uint32_t countdown_tmr = 0;
@@ -242,18 +247,21 @@ void capture() {
 void display() { canvas.pushSprite(0, 0); }
 
 void loop() {
-    btn.tick();
+    btnS.tick();
+    btnA.tick();
+    btnB.tick();
+    btnX.tick();
 
     switch (state) {
         case VIEWFINDER:
-            if (btn.click()) {
+            if (btnS.click()) {
                 state = COUNTDOWN;
                 countdown = COUNTDOWN_TICK_COUNT;
                 countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
                 break;
             }
 
-            if (btn.hold()) {
+            if (btnS.hold() || btnX.click()) {
                 state = SETTINGS;
                 break;
             }
@@ -263,8 +271,10 @@ void loop() {
             break;
 
         case SETTINGS:
-            if (btn.click()) menu.clickHandler();
-            if (btn.hold()) menu.holdHandler();
+            if (btnA.click()) menu.upHandler();
+            if (btnB.click()) menu.downHandler();
+            if (btnX.click()) menu.selectHandler();
+            if (btnX.hold()) menu.backHandler();
 
             if (menu.wantsExit()) {
                 state = VIEWFINDER;
@@ -279,7 +289,7 @@ void loop() {
             break;
 
         case COUNTDOWN:
-            if (btn.click()) {
+            if (btnS.click()) {
                 state = VIEWFINDER;
                 countdown = 0;
                 break;
@@ -308,7 +318,7 @@ void loop() {
             break;
 
         case PICTURE:
-            if (btn.click()) state = VIEWFINDER;
+            if (btnS.click()) state = VIEWFINDER;
             break;
     }
 }
