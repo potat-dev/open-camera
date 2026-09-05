@@ -14,22 +14,22 @@
 
 #define NOT_CONNECTED -1
 
-#define SIOD_GPIO  4
-#define SIOC_GPIO  5
-#define VSYNC_GPIO 6
-#define HREF_GPIO  7
-#define PCLK_GPIO  15
+#define CAM_SDA   4
+#define CAM_SCL   5
+#define CAM_VSYNC 6
+#define CAM_HREF  7
+#define CAM_PCLK  15
 
-#define D0_GPIO 1
-#define D1_GPIO 2
-#define D2_GPIO 9
-#define D3_GPIO 10
-#define D4_GPIO 11
-#define D5_GPIO 12
-#define D6_GPIO 13
-#define D7_GPIO 14
+#define CAM_D0 1
+#define CAM_D1 2
+#define CAM_D2 9
+#define CAM_D3 10
+#define CAM_D4 11
+#define CAM_D5 12
+#define CAM_D6 13
+#define CAM_D7 14
 
-#define CLOCK_FREQUENCY 20000000
+#define CAM_PCLK_FREQ 20000000
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
@@ -74,31 +74,31 @@ static camera_config_t build_config(const cam_mode_t& mode) {
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer = LEDC_TIMER_0;
 
-    config.pin_d0 = D0_GPIO;
-    config.pin_d1 = D1_GPIO;
-    config.pin_d2 = D2_GPIO;
-    config.pin_d3 = D3_GPIO;
-    config.pin_d4 = D4_GPIO;
-    config.pin_d5 = D5_GPIO;
-    config.pin_d6 = D6_GPIO;
-    config.pin_d7 = D7_GPIO;
+    config.pin_d0 = CAM_D0;
+    config.pin_d1 = CAM_D1;
+    config.pin_d2 = CAM_D2;
+    config.pin_d3 = CAM_D3;
+    config.pin_d4 = CAM_D4;
+    config.pin_d5 = CAM_D5;
+    config.pin_d6 = CAM_D6;
+    config.pin_d7 = CAM_D7;
 
     config.pin_xclk = NOT_CONNECTED;  // sensor has its own oscillator
     config.pin_pwdn = NOT_CONNECTED;
     config.pin_reset = NOT_CONNECTED;
 
-    config.pin_pclk = PCLK_GPIO;
-    config.pin_href = HREF_GPIO;
-    config.pin_vsync = VSYNC_GPIO;
-    config.pin_sccb_sda = SIOD_GPIO;
-    config.pin_sccb_scl = SIOC_GPIO;
+    config.pin_pclk = CAM_PCLK;
+    config.pin_href = CAM_HREF;
+    config.pin_vsync = CAM_VSYNC;
+    config.pin_sccb_sda = CAM_SDA;
+    config.pin_sccb_scl = CAM_SCL;
 
     config.pixel_format = mode.pixformat;
     config.frame_size = mode.framesize;
     config.fb_count = mode.fb_count;
 
     config.grab_mode = CAMERA_GRAB_LATEST;
-    config.xclk_freq_hz = CLOCK_FREQUENCY;
+    config.xclk_freq_hz = CAM_PCLK_FREQ;
 
     return config;
 }
