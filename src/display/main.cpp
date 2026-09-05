@@ -103,6 +103,8 @@ Button btnA(A_BTN_GPIO);
 Button btnB(B_BTN_GPIO);
 Button btnX(X_BTN_GPIO);
 
+const std::vector<Button*> buttons = {&btnS, &btnA, &btnB, &btnX};
+
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
 
 MenuItem contrast = {"Contr", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
@@ -141,7 +143,7 @@ MenuItem* menuItems[] = {
 
 Menu menu(menuItems, 20);
 
-static int8_t countdown = 0;
+static uint8_t countdown = 0;
 static uint32_t countdown_tmr = 0;
 
 static camera_config_t get_camera_config() {
@@ -263,16 +265,47 @@ void capture() {
 
 void display() { canvas.pushSprite(0, 0); }
 
+void transitionTo(State next) {
+    // exit action
+    switch (state) {
+        case SETTINGS:
+            if (menu.changed()) configure_camera();
+            break;
+
+        case COUNTDOWN:
+            countdown = 0;
+
+        default:
+            break;
+    }
+
+    state = next;
+
+    // entry action
+    switch (state) {
+        case COUNTDOWN:
+            countdown = COUNTDOWN_TICK_COUNT;
+            countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
+            break;
+
+        case PICTURE:
+            capture();
+            display();
+            break;
+
+        default:
+            break;
+    }
+}
+
 void handleViewfinder() {
     if (btnS.click()) {
-        state = COUNTDOWN;
-        countdown = COUNTDOWN_TICK_COUNT;
-        countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
+        transitionTo(COUNTDOWN);
         return;
     }
 
     if (btnS.hold() || btnX.click()) {
-        state = SETTINGS;
+        transitionTo(SETTINGS);
         return;
     }
 
@@ -287,21 +320,32 @@ void handleSettings() {
     if (btnX.hold()) menu.backHandler();
 
     if (menu.wantsExit()) {
-        state = VIEWFINDER;
+        transitionTo(VIEWFINDER);
         return;
     }
 
-    if (menu.changed()) configure_camera();
+    if (menu.changed()) {
+        configure_camera();
+        return;
+    }
 
     capture();
     menu.draw(canvas, 16, menuScale.value);
     display();
 }
 
+void drawCountdown() {
+    char buf[12];
+    sprintf(buf, "Shot in %d", countdown);
+    canvas.setTextSize(4);
+    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+    canvas.setTextDatum(lgfx::baseline_center);
+    canvas.drawString(buf, 320 / 2, 240 - 24);
+}
+
 void handleCountdown() {
     if (btnS.click()) {
-        state = VIEWFINDER;
-        countdown = 0;
+        transitionTo(VIEWFINDER);
         return;
     }
 
@@ -309,35 +353,23 @@ void handleCountdown() {
         if (--countdown) {
             countdown_tmr += COUNTDOWN_TICK_TIME;
         } else {
-            state = PICTURE;
+            transitionTo(PICTURE);
+            return;
         }
     }
 
     capture();
-
-    if (countdown > 0) {
-        char buf[12];
-        sprintf(buf, "Shot in %d", countdown);
-        canvas.setTextSize(4);
-        canvas.setTextColor(TFT_WHITE, TFT_BLACK);
-        canvas.setTextDatum(lgfx::baseline_center);
-        canvas.drawString(buf, 320 / 2, 240 - 24);
-    }
-
+    drawCountdown();
     display();
 }
 
 void handlePicture() {
-    if (btnS.click()) state = VIEWFINDER;
+    if (btnS.click()) transitionTo(VIEWFINDER);
 }
 
 void loop() {
-    btnS.tick();
-    btnA.tick();
-    btnB.tick();
-    btnX.tick();
+    for (Button* btn : buttons) btn->tick();
 
-    // TODO: rewrite to enter/exit state pattern
     switch (state) {
         case VIEWFINDER:
             handleViewfinder();
