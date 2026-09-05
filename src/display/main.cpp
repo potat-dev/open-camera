@@ -43,7 +43,7 @@ class LGFX_Display : public lgfx::LGFX_Device {
     LGFX_Display(void) {
         auto bus = bus_instance.config();
 
-        bus.pin_dc    = TFT_DC;
+        bus.pin_dc    = DISPLAY_DC;
         bus.pin_sclk  = SPI_SCK;
         bus.pin_mosi  = SPI_MOSI;
         bus.pin_miso  = NOT_CONNECTED;
@@ -53,15 +53,15 @@ class LGFX_Display : public lgfx::LGFX_Device {
         bus.use_lock    = true;
         bus.spi_host    = SPI2_HOST;
         bus.dma_channel = SPI_DMA_CH_AUTO;  // enable DMA transfers
-        bus.freq_write  = TFT_FREQ_WRITE;
-        bus.freq_read   = TFT_FREQ_READ;
+        bus.freq_write  = DISPLAY_FREQ_WRITE;
+        bus.freq_read   = DISPLAY_FREQ_READ;
 
         bus_instance.config(bus);
         panel_instance.setBus(&bus_instance);
 
         auto panel = panel_instance.config();
 
-        panel.pin_cs   = TFT_CS;
+        panel.pin_cs   = DISPLAY_CS;
         panel.pin_rst  = NOT_CONNECTED;
         panel.pin_busy = NOT_CONNECTED;
 
@@ -128,31 +128,31 @@ static camera_config_t get_camera_config() {
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer   = LEDC_TIMER_0;
 
-    config.pin_d0 = CAM_D0;
-    config.pin_d1 = CAM_D1;
-    config.pin_d2 = CAM_D2;
-    config.pin_d3 = CAM_D3;
-    config.pin_d4 = CAM_D4;
-    config.pin_d5 = CAM_D5;
-    config.pin_d6 = CAM_D6;
-    config.pin_d7 = CAM_D7;
+    config.pin_d0 = CAMERA_D0;
+    config.pin_d1 = CAMERA_D1;
+    config.pin_d2 = CAMERA_D2;
+    config.pin_d3 = CAMERA_D3;
+    config.pin_d4 = CAMERA_D4;
+    config.pin_d5 = CAMERA_D5;
+    config.pin_d6 = CAMERA_D6;
+    config.pin_d7 = CAMERA_D7;
 
     config.pin_xclk  = NOT_CONNECTED;  // sensor has its own oscillator
     config.pin_pwdn  = NOT_CONNECTED;
     config.pin_reset = NOT_CONNECTED;
 
-    config.pin_pclk     = CAM_PCLK;
-    config.pin_href     = CAM_HREF;
-    config.pin_vsync    = CAM_VSYNC;
-    config.pin_sccb_sda = CAM_SDA;
-    config.pin_sccb_scl = CAM_SCL;
+    config.pin_pclk     = CAMERA_PCLK;
+    config.pin_href     = CAMERA_HREF;
+    config.pin_vsync    = CAMERA_VSYNC;
+    config.pin_sccb_sda = CAMERA_SDA;
+    config.pin_sccb_scl = CAMERA_SCL;
 
     config.pixel_format = PIXFORMAT_RGB565;
     config.frame_size   = FRAMESIZE_QVGA;
 
     config.fb_count     = 2;
     config.grab_mode    = CAMERA_GRAB_LATEST;
-    config.xclk_freq_hz = CAM_PCLK_FREQ;
+    config.xclk_freq_hz = CAMERA_PCLK_FREQ;
 
     return config;
 }
