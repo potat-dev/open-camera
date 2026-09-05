@@ -269,6 +269,7 @@ void loop() {
     btnB.tick();
     btnX.tick();
 
+    // TODO: rewrite to enter/exit state pattern
     switch (state) {
         case VIEWFINDER:
             if (btnS.click()) {
@@ -288,8 +289,8 @@ void loop() {
             break;
 
         case SETTINGS:
-            if (btnA.click()) menu.upHandler();
-            if (btnB.click()) menu.downHandler();
+            if (btnA.click() || btnA.step()) menu.upHandler();
+            if (btnB.click() || btnB.step()) menu.downHandler();
             if (btnX.click()) menu.selectHandler();
             if (btnX.hold()) menu.backHandler();
 
