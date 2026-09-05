@@ -30,10 +30,11 @@
 #define TFT_DC   41
 #define TFT_CS   42
 
-#define S_BTN_GPIO 16  // shutter
 #define A_BTN_GPIO 21  // up
 #define B_BTN_GPIO 20  // down
 #define X_BTN_GPIO 19  // select
+
+#define S_BTN_GPIO 16  // shutter (not used)
 
 #define COUNTDOWN_TICK_COUNT 3
 #define COUNTDOWN_TICK_TIME  750
@@ -98,12 +99,11 @@ class LGFX : public lgfx::LGFX_Device {
 LGFX lcd;
 LGFX_Sprite canvas(&lcd);
 
-Button btnS(S_BTN_GPIO);
 Button btnA(A_BTN_GPIO);
 Button btnB(B_BTN_GPIO);
 Button btnX(X_BTN_GPIO);
 
-const std::vector<Button*> buttons = {&btnS, &btnA, &btnB, &btnX};
+const std::vector<Button*> buttons = {&btnA, &btnB, &btnX};
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
 
@@ -299,15 +299,26 @@ void transitionTo(State next) {
 }
 
 void handleViewfinder() {
-    if (btnS.click()) {
+    if (btnX.click()) {
         transitionTo(COUNTDOWN);
         return;
     }
 
-    if (btnS.hold() || btnX.click()) {
+    if (btnX.hold()) {
         transitionTo(SETTINGS);
         return;
     }
+
+    // if (btnA.click()) rotateCCW();    // TODO: implement
+    // if (btnB.click()) rotateCW();     // TODO: implement
+    // if (btnA.hold()) flipScreen();    // TODO: implement (hFlip)
+    // if (btnB.hold()) viewPictures();  // TODO: implement
+
+    // or
+
+    // if (btnA.click()) rotateScreen();  // TODO: implement
+    // if (btnB.click()) viewPictures();  // TODO: implement
+    // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
     capture();
     display();
@@ -344,11 +355,15 @@ void drawCountdown() {
 }
 
 void handleCountdown() {
-    if (btnS.click()) {
+    if (btnX.click()) {
         transitionTo(VIEWFINDER);
         return;
     }
 
+    // if (btnA.click()) countdown += 5;  // TODO: implement (delay shot)
+    // if (btnB.click()) countdown = 0;   // TODO: implement (shot immediately)
+
+    // TODO: improve logic here:
     if (countdown && countdown_tmr < millis()) {
         if (--countdown) {
             countdown_tmr += COUNTDOWN_TICK_TIME;
@@ -364,7 +379,18 @@ void handleCountdown() {
 }
 
 void handlePicture() {
-    if (btnS.click()) transitionTo(VIEWFINDER);
+    if (btnX.click()) transitionTo(VIEWFINDER);
+
+    // if (btnX.hold()) deletePicture();  // TODO: implement
+    // if (btnA.click()) nextPicture();   // TODO: implement
+    // if (btnB.click()) prevPicture();   // TODO: implement
+
+    // note: pressing prev:
+    // pic_3 (current) -> pic_2 (prev) -> pic_1 -> pic_0
+    // pressing next goes other direction and loops to pic_0
+
+    // TODO: read from SD card and shrink to display size (generate thumbnail)
+    // TODO: pre-load prev and next thumbnail and store in RAM
 }
 
 void loop() {
