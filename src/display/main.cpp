@@ -263,6 +263,74 @@ void capture() {
 
 void display() { canvas.pushSprite(0, 0); }
 
+void handleViewfinder() {
+    if (btnS.click()) {
+        state = COUNTDOWN;
+        countdown = COUNTDOWN_TICK_COUNT;
+        countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
+        return;
+    }
+
+    if (btnS.hold() || btnX.click()) {
+        state = SETTINGS;
+        return;
+    }
+
+    capture();
+    display();
+}
+
+void handleSettings() {
+    if (btnA.click() || btnA.step()) menu.upHandler();
+    if (btnB.click() || btnB.step()) menu.downHandler();
+    if (btnX.click()) menu.selectHandler();
+    if (btnX.hold()) menu.backHandler();
+
+    if (menu.wantsExit()) {
+        state = VIEWFINDER;
+        return;
+    }
+
+    if (menu.changed()) configure_camera();
+
+    capture();
+    menu.draw(canvas, 16, menuScale.value);
+    display();
+}
+
+void handleCountdown() {
+    if (btnS.click()) {
+        state = VIEWFINDER;
+        countdown = 0;
+        return;
+    }
+
+    if (countdown && countdown_tmr < millis()) {
+        if (--countdown) {
+            countdown_tmr += COUNTDOWN_TICK_TIME;
+        } else {
+            state = PICTURE;
+        }
+    }
+
+    capture();
+
+    if (countdown > 0) {
+        char buf[12];
+        sprintf(buf, "Shot in %d", countdown);
+        canvas.setTextSize(4);
+        canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+        canvas.setTextDatum(lgfx::baseline_center);
+        canvas.drawString(buf, 320 / 2, 240 - 24);
+    }
+
+    display();
+}
+
+void handlePicture() {
+    if (btnS.click()) state = VIEWFINDER;
+}
+
 void loop() {
     btnS.tick();
     btnA.tick();
@@ -272,71 +340,19 @@ void loop() {
     // TODO: rewrite to enter/exit state pattern
     switch (state) {
         case VIEWFINDER:
-            if (btnS.click()) {
-                state = COUNTDOWN;
-                countdown = COUNTDOWN_TICK_COUNT;
-                countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
-                break;
-            }
-
-            if (btnS.hold() || btnX.click()) {
-                state = SETTINGS;
-                break;
-            }
-
-            capture();
-            display();
+            handleViewfinder();
             break;
 
         case SETTINGS:
-            if (btnA.click() || btnA.step()) menu.upHandler();
-            if (btnB.click() || btnB.step()) menu.downHandler();
-            if (btnX.click()) menu.selectHandler();
-            if (btnX.hold()) menu.backHandler();
-
-            if (menu.wantsExit()) {
-                state = VIEWFINDER;
-                break;
-            }
-
-            if (menu.changed()) configure_camera();
-
-            capture();
-            menu.draw(canvas, 16, menuScale.value);
-            display();
+            handleSettings();
             break;
 
         case COUNTDOWN:
-            if (btnS.click()) {
-                state = VIEWFINDER;
-                countdown = 0;
-                break;
-            }
-
-            if (countdown && countdown_tmr < millis()) {
-                if (--countdown) {
-                    countdown_tmr += COUNTDOWN_TICK_TIME;
-                } else {
-                    state = PICTURE;
-                }
-            }
-
-            capture();
-
-            if (countdown > 0) {
-                char buf[12];
-                sprintf(buf, "Shot in %d", countdown);
-                canvas.setTextSize(4);
-                canvas.setTextColor(TFT_WHITE, TFT_BLACK);
-                canvas.setTextDatum(lgfx::baseline_center);
-                canvas.drawString(buf, 320 / 2, 240 - 24);
-            }
-
-            display();
+            handleCountdown();
             break;
 
         case PICTURE:
-            if (btnS.click()) state = VIEWFINDER;
+            handlePicture();
             break;
     }
 }
