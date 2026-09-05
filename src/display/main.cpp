@@ -10,48 +10,50 @@
 
 constexpr unsigned long long operator"" _MHz(unsigned long long mhz) { return mhz * 1000000ULL; }
 
-#define NOT_CONNECTED -1
+constexpr int16_t NOT_CONNECTED = -1;
 
-#define CAM_D0 1
-#define CAM_D1 2
-#define CAM_D2 9
-#define CAM_D3 10
-#define CAM_D4 11
-#define CAM_D5 12
-#define CAM_D6 13
-#define CAM_D7 14
+constexpr uint8_t CAM_D0 = 1;
+constexpr uint8_t CAM_D1 = 2;
+constexpr uint8_t CAM_D2 = 9;
+constexpr uint8_t CAM_D3 = 10;
+constexpr uint8_t CAM_D4 = 11;
+constexpr uint8_t CAM_D5 = 12;
+constexpr uint8_t CAM_D6 = 13;
+constexpr uint8_t CAM_D7 = 14;
 
-#define CAM_SDA   4
-#define CAM_SCL   5
-#define CAM_VSYNC 6
-#define CAM_HREF  7
-#define CAM_PCLK  15  // pixel clock
+constexpr uint8_t CAM_SDA = 4;
+constexpr uint8_t CAM_SCL = 5;
+constexpr uint8_t CAM_VSYNC = 6;
+constexpr uint8_t CAM_HREF = 7;
+constexpr uint8_t CAM_PCLK = 15;  // pixel clock
 
-#define SPI_SCK  39  // for TFT and SD
-#define SPI_MOSI 40  // for TFT (SDA) and SD
-#define SPI_MISO 48  // for SD only
+constexpr uint8_t SPI_SCK = 39;   // for TFT and SD
+constexpr uint8_t SPI_MOSI = 40;  // for TFT (SDA) and SD
+constexpr uint8_t SPI_MISO = 48;  // for SD only
 
-#define TFT_DC 41
-#define TFT_CS 42
+constexpr uint8_t TFT_DC = 41;
+constexpr uint8_t TFT_CS = 42;
 
-#define SD_CS 47
+constexpr uint8_t SD_CS = 47;
 
-#define BTN_A 21  // up
-#define BTN_B 20  // down
-#define BTN_X 19  // select
+constexpr uint8_t BTN_A = 21;  // up
+constexpr uint8_t BTN_B = 20;  // down
+constexpr uint8_t BTN_X = 19;  // select
 
-#define BTN_SHUTTER 16  // (not used rn)
+constexpr uint8_t BTN_SHUTTER = 16;  // (not used rn)
 
-#define DISPLAY_WIDTH  320
-#define DISPLAY_HEIGHT 240
+// size in landscape orientation
+constexpr uint16_t DISPLAY_WIDTH = 320;
+constexpr uint16_t DISPLAY_HEIGHT = 240;
 
-#define COUNTDOWN_TICK_COUNT 3
-#define COUNTDOWN_TICK_TIME  750
+// countdown ticks
+constexpr uint16_t TICK_COUNT = 3;
+constexpr uint32_t TICK_TIME = 750;
 
-#define CAM_PCLK_FREQ 20_MHz
-
-#define DISPLAY_FREQ_WRITE 80_MHz
-#define DISPLAY_FREQ_READ  16_MHz
+// data transfer frequency
+constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets
+constexpr uint32_t DISPLAY_FREQ_READ = 16_MHz;
+constexpr uint32_t CAM_PCLK_FREQ = 20_MHz;
 
 // state
 
@@ -64,7 +66,7 @@ enum State {
 
 static State state = VIEWFINDER;
 
-static uint8_t countdown = 0;
+static uint16_t countdown = 0;
 static uint32_t countdown_tmr = 0;
 
 // buttons
@@ -300,8 +302,8 @@ void transitionTo(State next) {
     // entry action
     switch (state) {
         case COUNTDOWN:
-            countdown = COUNTDOWN_TICK_COUNT;
-            countdown_tmr = millis() + COUNTDOWN_TICK_TIME;
+            countdown = TICK_COUNT;
+            countdown_tmr = millis() + TICK_TIME;
             break;
 
         case PICTURE:
@@ -376,13 +378,14 @@ void handleCountdown() {
         return;
     }
 
-    // if (btnA.click()) countdown += 5;  // TODO: implement (delay shot)
-    // if (btnB.click()) countdown = 0;   // TODO: implement (shot immediately)
+    // if (btnA.click() || btnA.step()) countdown += 5;  // TODO: implement (delay shot)
+    // if (btnB.step()) countdown -= 5;                  // TODO: implement (decrement delay)
+    // if (btnB.click()) countdown = 0;                  // TODO: implement (shot immediately)
 
     // TODO: improve logic here:
     if (countdown && countdown_tmr < millis()) {
         if (--countdown) {
-            countdown_tmr += COUNTDOWN_TICK_TIME;
+            countdown_tmr += TICK_TIME;
         } else {
             transitionTo(PICTURE);
             return;
