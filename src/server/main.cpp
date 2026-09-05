@@ -5,31 +5,13 @@
 #include "esp_timer.h"
 #include "fb_gfx.h"
 #include "img_converters.h"
-#include "soc/rtc_cntl_reg.h"  //disable brownout problems
-#include "soc/soc.h"           //disable brownout problems
+#include "soc/rtc_cntl_reg.h"  // disable brownout problems
+#include "soc/soc.h"           // disable brownout problems
 
 // #include "dl_lib.h"
 
+#include "config.h"
 #include "secrets.h"
-
-#define NOT_CONNECTED -1
-
-#define CAM_SDA   4
-#define CAM_SCL   5
-#define CAM_VSYNC 6
-#define CAM_HREF  7
-#define CAM_PCLK  15
-
-#define CAM_D0 1
-#define CAM_D1 2
-#define CAM_D2 9
-#define CAM_D3 10
-#define CAM_D4 11
-#define CAM_D5 12
-#define CAM_D6 13
-#define CAM_D7 14
-
-#define CAM_PCLK_FREQ 20000000
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
