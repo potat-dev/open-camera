@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common.h"
+
 constexpr int16_t NOT_CONNECTED = -1;
 
 // pixel data pins

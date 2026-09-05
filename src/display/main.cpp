@@ -9,8 +9,6 @@
 #include "fb_gfx.h"
 #include "img_converters.h"
 
-constexpr unsigned long long operator"" _MHz(unsigned long long mhz) { return mhz * 1000000ULL; }
-
 // state
 
 enum State {
