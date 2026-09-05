@@ -34,8 +34,8 @@
 #define PART_BOUNDARY "123456789000000000000987654321"
 
 static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
-static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
-static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+static const char* _STREAM_BOUNDARY     = "\r\n--" PART_BOUNDARY "\r\n";
+static const char* _STREAM_PART         = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
 httpd_handle_t camera_server = NULL;
 
@@ -49,7 +49,7 @@ struct cam_mode_t {
     // pixformat can be RGB565 or YUV422, or even JPEG
     // but only in some manual override mode when user applies no circuit bending
 
-    size_t fb_count;
+    size_t  fb_count;
     uint8_t quality;
     // for frame2jpg conversion in RGB565 or YUV422 mode
     // or for native JPEG quality in JPEG pixformat
@@ -58,9 +58,9 @@ struct cam_mode_t {
 };
 
 static cam_mode_t MODE_STREAM_MEDIUM = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2, 80};
-static cam_mode_t MODE_STREAM_HIGH = {FRAMESIZE_HVGA, PIXFORMAT_RGB565, 2, 80};
-static cam_mode_t MODE_PHOTO_MEDIUM = {FRAMESIZE_SXGA, PIXFORMAT_RGB565, 1, 85};
-static cam_mode_t MODE_PHOTO_HIGH = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1, 85};
+static cam_mode_t MODE_STREAM_HIGH   = {FRAMESIZE_HVGA, PIXFORMAT_RGB565, 2, 80};
+static cam_mode_t MODE_PHOTO_MEDIUM  = {FRAMESIZE_SXGA, PIXFORMAT_RGB565, 1, 85};
+static cam_mode_t MODE_PHOTO_HIGH    = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1, 85};
 
 static cam_mode_t MODE_NONE = {FRAMESIZE_INVALID, PIXFORMAT_RAW, 0, 0};
 
@@ -72,7 +72,7 @@ static camera_config_t build_config(const cam_mode_t& mode) {
     camera_config_t config = {};
 
     config.ledc_channel = LEDC_CHANNEL_0;
-    config.ledc_timer = LEDC_TIMER_0;
+    config.ledc_timer   = LEDC_TIMER_0;
 
     config.pin_d0 = CAM_D0;
     config.pin_d1 = CAM_D1;
@@ -83,21 +83,21 @@ static camera_config_t build_config(const cam_mode_t& mode) {
     config.pin_d6 = CAM_D6;
     config.pin_d7 = CAM_D7;
 
-    config.pin_xclk = NOT_CONNECTED;  // sensor has its own oscillator
-    config.pin_pwdn = NOT_CONNECTED;
+    config.pin_xclk  = NOT_CONNECTED;  // sensor has its own oscillator
+    config.pin_pwdn  = NOT_CONNECTED;
     config.pin_reset = NOT_CONNECTED;
 
-    config.pin_pclk = CAM_PCLK;
-    config.pin_href = CAM_HREF;
-    config.pin_vsync = CAM_VSYNC;
+    config.pin_pclk     = CAM_PCLK;
+    config.pin_href     = CAM_HREF;
+    config.pin_vsync    = CAM_VSYNC;
     config.pin_sccb_sda = CAM_SDA;
     config.pin_sccb_scl = CAM_SCL;
 
     config.pixel_format = mode.pixformat;
-    config.frame_size = mode.framesize;
-    config.fb_count = mode.fb_count;
+    config.frame_size   = mode.framesize;
+    config.fb_count     = mode.fb_count;
 
-    config.grab_mode = CAMERA_GRAB_LATEST;
+    config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAM_PCLK_FREQ;
 
     return config;
@@ -108,7 +108,7 @@ static bool ensure_camera_mode(const cam_mode_t& mode) {
     if (current_mode != MODE_NONE) esp_camera_deinit();
 
     camera_config_t config = build_config(mode);
-    esp_err_t err = esp_camera_init(&config);
+    esp_err_t       err    = esp_camera_init(&config);
 
     if (err != ESP_OK) {
         Serial.printf("Camera reinit failed switching mode: 0x%x\n", err);
@@ -141,14 +141,14 @@ static void log_psram(const char* label) {
 
 struct frame_result_t {
     camera_fb_t* raw_data;
-    uint8_t* data;
-    size_t len;
+    uint8_t*     data;
+    size_t       len;
 };
 
 static esp_err_t capture(frame_result_t& result, uint8_t quality) {
     result.raw_data = esp_camera_fb_get();
-    result.data = NULL;
-    result.len = 0;
+    result.data     = NULL;
+    result.len      = 0;
 
     if (!result.raw_data) {
         Serial.println("Camera capture failed");
@@ -205,7 +205,7 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 
         if (res == ESP_OK) {
             size_t hlen = snprintf(part_buf, sizeof(part_buf), _STREAM_PART, frame.len);
-            res = httpd_resp_send_chunk(req, part_buf, hlen);
+            res         = httpd_resp_send_chunk(req, part_buf, hlen);
         }
         if (res == ESP_OK) {
             res = httpd_resp_send_chunk(req, (const char*)frame.data, frame.len);
@@ -226,8 +226,8 @@ static esp_err_t stream_handler(httpd_req_t* req) {
 
 struct photo_buffer_ctx_t {
     uint8_t* data;
-    size_t len;
-    size_t capacity;
+    size_t   len;
+    size_t   capacity;
 };
 
 static size_t append_photo_chunk(void* arg, size_t index, const void* data, size_t len) {
@@ -239,7 +239,7 @@ static size_t append_photo_chunk(void* arg, size_t index, const void* data, size
         while (new_capacity < ctx->len + len) new_capacity *= 2;
         uint8_t* new_data = (uint8_t*)heap_caps_realloc(ctx->data, new_capacity, MALLOC_CAP_SPIRAM);
         if (!new_data) return 0;
-        ctx->data = new_data;
+        ctx->data     = new_data;
         ctx->capacity = new_capacity;
     }
 
@@ -274,6 +274,7 @@ static esp_err_t photo_handler(httpd_req_t* req) {
     }
 
     photo_buffer_ctx_t ctx = {NULL, 0, 0};
+
     bool ok = frame2jpg_cb(fb, mode->quality, append_photo_chunk, &ctx);
     esp_camera_fb_return(fb);
 
@@ -315,19 +316,19 @@ void startNetwork() {
 void startCameraServer() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
-    config.server_port = 80;
+    config.server_port      = 80;
     config.max_uri_handlers = 8;
-    config.stack_size = 10240;
+    config.stack_size       = 10240;
 
     if (httpd_start(&camera_server, &config) != ESP_OK) {
         Serial.println("Failed to start HTTP server");
         return;
     }
 
-    httpd_uri_t stream_uri = {"/stream", HTTP_GET, stream_handler, &MODE_STREAM_MEDIUM};
+    httpd_uri_t stream_uri    = {"/stream", HTTP_GET, stream_handler, &MODE_STREAM_MEDIUM};
     httpd_uri_t stream_hd_uri = {"/stream_hd", HTTP_GET, stream_handler, &MODE_STREAM_HIGH};
-    httpd_uri_t photo_uri = {"/photo", HTTP_GET, photo_handler, &MODE_PHOTO_MEDIUM};
-    httpd_uri_t photo_hd_uri = {"/photo_hd", HTTP_GET, photo_handler, &MODE_PHOTO_HIGH};
+    httpd_uri_t photo_uri     = {"/photo", HTTP_GET, photo_handler, &MODE_PHOTO_MEDIUM};
+    httpd_uri_t photo_hd_uri  = {"/photo_hd", HTTP_GET, photo_handler, &MODE_PHOTO_HIGH};
 
     httpd_register_uri_handler(camera_server, &stream_uri);
     httpd_register_uri_handler(camera_server, &stream_hd_uri);

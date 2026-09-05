@@ -12,6 +12,7 @@ constexpr unsigned long long operator"" _MHz(unsigned long long mhz) { return mh
 
 constexpr int16_t NOT_CONNECTED = -1;
 
+// camera pixel data
 constexpr uint8_t CAM_D0 = 1;
 constexpr uint8_t CAM_D1 = 2;
 constexpr uint8_t CAM_D2 = 9;
@@ -21,21 +22,26 @@ constexpr uint8_t CAM_D5 = 12;
 constexpr uint8_t CAM_D6 = 13;
 constexpr uint8_t CAM_D7 = 14;
 
-constexpr uint8_t CAM_SDA = 4;
-constexpr uint8_t CAM_SCL = 5;
+// camera control and sync
+constexpr uint8_t CAM_SDA   = 4;
+constexpr uint8_t CAM_SCL   = 5;
 constexpr uint8_t CAM_VSYNC = 6;
-constexpr uint8_t CAM_HREF = 7;
-constexpr uint8_t CAM_PCLK = 15;  // pixel clock
+constexpr uint8_t CAM_HREF  = 7;
+constexpr uint8_t CAM_PCLK  = 15;  // pixel clock
 
-constexpr uint8_t SPI_SCK = 39;   // for TFT and SD
+// SPI
+constexpr uint8_t SPI_SCK  = 39;  // for TFT and SD
 constexpr uint8_t SPI_MOSI = 40;  // for TFT (SDA) and SD
 constexpr uint8_t SPI_MISO = 48;  // for SD only
 
+// display
 constexpr uint8_t TFT_DC = 41;
 constexpr uint8_t TFT_CS = 42;
 
+// SD card
 constexpr uint8_t SD_CS = 47;
 
+// buttons
 constexpr uint8_t BTN_A = 21;  // up
 constexpr uint8_t BTN_B = 20;  // down
 constexpr uint8_t BTN_X = 19;  // select
@@ -43,17 +49,17 @@ constexpr uint8_t BTN_X = 19;  // select
 constexpr uint8_t BTN_SHUTTER = 16;  // (not used rn)
 
 // size in landscape orientation
-constexpr uint16_t DISPLAY_WIDTH = 320;
+constexpr uint16_t DISPLAY_WIDTH  = 320;
 constexpr uint16_t DISPLAY_HEIGHT = 240;
 
 // countdown ticks
 constexpr uint16_t TICK_COUNT = 3;
-constexpr uint32_t TICK_TIME = 750;
+constexpr uint32_t TICK_TIME  = 750;
 
 // data transfer frequency
-constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets
-constexpr uint32_t DISPLAY_FREQ_READ = 16_MHz;
-constexpr uint32_t CAM_PCLK_FREQ = 20_MHz;
+constexpr uint32_t TFT_FREQ_WRITE = 80_MHz;  // pizdets
+constexpr uint32_t TFT_FREQ_READ  = 16_MHz;
+constexpr uint32_t CAM_PCLK_FREQ  = 20_MHz;
 
 // state
 
@@ -66,7 +72,7 @@ enum State {
 
 static State state = VIEWFINDER;
 
-static uint16_t countdown = 0;
+static uint16_t countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
 // buttons
@@ -79,79 +85,80 @@ const std::vector<Button*> buttons = {&btnA, &btnB, &btnX};
 
 // display
 
-class LGFX : public lgfx::LGFX_Device {
+class LGFX_Display : public lgfx::LGFX_Device {
     lgfx::Panel_ST7789 panel_instance;
-    lgfx::Bus_SPI bus_instance;
+    lgfx::Bus_SPI      bus_instance;
 
    public:
-    LGFX(void) {
+    LGFX_Display(void) {
         auto bus = bus_instance.config();
 
-        bus.pin_dc = TFT_DC;
-        bus.pin_sclk = SPI_SCK;
-        bus.pin_mosi = SPI_MOSI;
-        bus.pin_miso = NOT_CONNECTED;
+        bus.pin_dc    = TFT_DC;
+        bus.pin_sclk  = SPI_SCK;
+        bus.pin_mosi  = SPI_MOSI;
+        bus.pin_miso  = NOT_CONNECTED;
         bus.spi_3wire = true;  // no MISO on this board
 
-        bus.spi_mode = 0;
-        bus.use_lock = true;
-        bus.spi_host = SPI2_HOST;
+        bus.spi_mode    = 0;
+        bus.use_lock    = true;
+        bus.spi_host    = SPI2_HOST;
         bus.dma_channel = SPI_DMA_CH_AUTO;  // enable DMA transfers
-        bus.freq_write = DISPLAY_FREQ_WRITE;
-        bus.freq_read = DISPLAY_FREQ_READ;
+        bus.freq_write  = TFT_FREQ_WRITE;
+        bus.freq_read   = TFT_FREQ_READ;
 
         bus_instance.config(bus);
         panel_instance.setBus(&bus_instance);
 
         auto panel = panel_instance.config();
 
-        panel.pin_cs = TFT_CS;
-        panel.pin_rst = NOT_CONNECTED;
+        panel.pin_cs   = TFT_CS;
+        panel.pin_rst  = NOT_CONNECTED;
         panel.pin_busy = NOT_CONNECTED;
 
         // physical panel is portrait but we use it as landscape
-        panel.panel_width = DISPLAY_HEIGHT;
-        panel.panel_height = DISPLAY_WIDTH;
+        panel.panel_width     = DISPLAY_HEIGHT;
+        panel.panel_height    = DISPLAY_WIDTH;
         panel.offset_rotation = 1;  // landscape
-        panel.invert = true;        // invert colors
+
+        panel.invert = true;  // invert colors
 
         panel_instance.config(panel);
         setPanel(&panel_instance);
     }
 };
 
-LGFX lcd;
-LGFX_Sprite canvas(&lcd);
+LGFX_Display display;
+LGFX_Sprite  canvas(&display);
 
 // menu
 
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
 
-MenuItem contrast = {"Contr", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
+MenuItem contrast   = {"Contr", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
 MenuItem brightness = {"Bright", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
 MenuItem saturation = {"Satur", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
-MenuItem sharpness = {"Sharp", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
+MenuItem sharpness  = {"Sharp", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
 
-const char* wbOptions[] = {"Auto", "Sunny", "Cloudy", "Office", "Home"};
-MenuItem whiteBalance = {"White", MENU_SELECT, 0, wbOptions, 5};
+const char* wbOptions[]  = {"Auto", "Sunny", "Cloudy", "Office", "Home"};
+MenuItem    whiteBalance = {"White", MENU_SELECT, 0, wbOptions, 5};
 
 const char* effectOptions[] = {"None", "Invert", "Gray", "Red", "Green", "Blue", "Sepia"};
-MenuItem effect = {"Effect", MENU_SELECT, 0, effectOptions, 7};
+MenuItem    effect          = {"Effect", MENU_SELECT, 0, effectOptions, 7};
 
 MenuItem hFlip = {"FlipH", MENU_TOGGLE, 0};
 MenuItem vFlip = {"FlipV", MENU_TOGGLE, 0};
 
-MenuItem expCtrl = {"ExpCtrl", MENU_TOGGLE, 1};
+MenuItem expCtrl  = {"ExpCtrl", MENU_TOGGLE, 1};
 MenuItem gainCtrl = {"GainCtrl", MENU_TOGGLE, 1};
 MenuItem colorBar = {"ColorBar", MENU_TOGGLE, 0};
 MenuItem whiteBal = {"WhiteBal", MENU_TOGGLE, 1};
-MenuItem gainAWB = {"GainAWB", MENU_TOGGLE, 1};
-MenuItem rawGMA = {"RawGMA", MENU_TOGGLE, 1};
-MenuItem aec2 = {"AEC2", MENU_TOGGLE, 0};
-MenuItem lenc = {"LenC", MENU_TOGGLE, 1};
-MenuItem bpc = {"BPC", MENU_TOGGLE, 0};
-MenuItem wpc = {"WPC", MENU_TOGGLE, 1};
-MenuItem dcw = {"DCW", MENU_TOGGLE, 1};
+MenuItem gainAWB  = {"GainAWB", MENU_TOGGLE, 1};
+MenuItem rawGMA   = {"RawGMA", MENU_TOGGLE, 1};
+MenuItem aec2     = {"AEC2", MENU_TOGGLE, 0};
+MenuItem lenc     = {"LenC", MENU_TOGGLE, 1};
+MenuItem bpc      = {"BPC", MENU_TOGGLE, 0};
+MenuItem wpc      = {"WPC", MENU_TOGGLE, 1};
+MenuItem dcw      = {"DCW", MENU_TOGGLE, 1};
 
 MenuItem menuScale = {"TextSize", MENU_INTEGER, 2, nullptr, 0, 2, 3, 1};
 
@@ -169,7 +176,7 @@ static camera_config_t get_camera_config() {
     camera_config_t config = {};
 
     config.ledc_channel = LEDC_CHANNEL_0;
-    config.ledc_timer = LEDC_TIMER_0;
+    config.ledc_timer   = LEDC_TIMER_0;
 
     config.pin_d0 = CAM_D0;
     config.pin_d1 = CAM_D1;
@@ -180,20 +187,21 @@ static camera_config_t get_camera_config() {
     config.pin_d6 = CAM_D6;
     config.pin_d7 = CAM_D7;
 
-    config.pin_xclk = NOT_CONNECTED;  // sensor has its own oscillator
-    config.pin_pwdn = NOT_CONNECTED;
+    config.pin_xclk  = NOT_CONNECTED;  // sensor has its own oscillator
+    config.pin_pwdn  = NOT_CONNECTED;
     config.pin_reset = NOT_CONNECTED;
 
-    config.pin_pclk = CAM_PCLK;
-    config.pin_href = CAM_HREF;
-    config.pin_vsync = CAM_VSYNC;
+    config.pin_pclk     = CAM_PCLK;
+    config.pin_href     = CAM_HREF;
+    config.pin_vsync    = CAM_VSYNC;
     config.pin_sccb_sda = CAM_SDA;
     config.pin_sccb_scl = CAM_SCL;
 
     config.pixel_format = PIXFORMAT_RGB565;
-    config.frame_size = FRAMESIZE_QVGA;
-    config.fb_count = 2;
-    config.grab_mode = CAMERA_GRAB_LATEST;
+    config.frame_size   = FRAMESIZE_QVGA;
+
+    config.fb_count     = 2;
+    config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAM_PCLK_FREQ;
 
     return config;
@@ -256,21 +264,21 @@ void setup() {
     }
     configure_camera();
 
-    lcd.init();
+    display.init();
 
 #ifdef USE_LOW_POWER_SPI
     gpio_set_drive_capability((gpio_num_t)SPI_SCK, GPIO_DRIVE_CAP_0);
     gpio_set_drive_capability((gpio_num_t)SPI_MOSI, GPIO_DRIVE_CAP_0);
 #endif
 
-    lcd.setSwapBytes(false);  // RGB565 byte order
+    display.setSwapBytes(false);  // RGB565 byte order
 
     canvas.setPsram(true);
     canvas.setColorDepth(16);
     canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
 }
 
-void capture() {
+void drawFrame() {
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) {
         Serial.println("Capture failed");
@@ -281,7 +289,7 @@ void capture() {
     esp_camera_fb_return(fb);
 }
 
-void display() { canvas.pushSprite(0, 0); }
+void updateDisplay() { canvas.pushSprite(0, 0); }
 
 void transitionTo(State next) {
     // exit action
@@ -302,13 +310,13 @@ void transitionTo(State next) {
     // entry action
     switch (state) {
         case COUNTDOWN:
-            countdown = TICK_COUNT;
+            countdown     = TICK_COUNT;
             countdown_tmr = millis() + TICK_TIME;
             break;
 
         case PICTURE:
-            capture();
-            display();
+            drawFrame();
+            updateDisplay();
             break;
 
         default:
@@ -338,9 +346,11 @@ void handleViewfinder() {
     // if (btnB.click()) viewPictures();  // TODO: implement
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
-    capture();
-    display();
+    drawFrame();
+    updateDisplay();
 }
+
+void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
 
 void handleSettings() {
     if (btnA.click() || btnA.step()) menu.upHandler();
@@ -358,9 +368,9 @@ void handleSettings() {
         return;
     }
 
-    capture();
-    menu.draw(canvas, 16, menuScale.value);
-    display();
+    drawFrame();
+    drawMenu();
+    updateDisplay();
 }
 
 void drawCountdown() {
@@ -392,9 +402,9 @@ void handleCountdown() {
         }
     }
 
-    capture();
+    drawFrame();
     drawCountdown();
-    display();
+    updateDisplay();
 }
 
 void handlePicture() {
