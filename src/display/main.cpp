@@ -20,7 +20,7 @@ enum State {
 
 static State state = VIEWFINDER;
 
-static uint16_t countdown     = 0;
+static uint8_t  countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
 // buttons
@@ -290,20 +290,27 @@ void drawCountdown() {
     canvas.drawString(buf, 320 / 2, 240 - 24);
 }
 
+void updateCountdown(uint8_t value) {
+    countdown     += value;
+    countdown_tmr  = millis() + TICK_TIME;
+}
+
 void handleCountdown() {
     if (btnX.click()) {
         transitionTo(VIEWFINDER);
         return;
     }
 
-    // if (btnA.click() || btnA.step()) countdown += 5;  // TODO: implement (delay shot)
-    // if (btnB.step()) countdown -= 5;                  // TODO: implement (decrement delay)
-    // if (btnB.click()) countdown = 0;                  // TODO: implement (shot immediately)
+    // TODO: 3 -> 10 -> 15 -> 20 ...
 
-    // TODO: improve logic here:
-    if (countdown && countdown_tmr < millis()) {
-        if (--countdown) {
-            countdown_tmr += TICK_TIME;
+    if (btnA.click()) updateCountdown(+5);
+
+    if (btnA.step()) updateCountdown(+3);
+    if (btnB.step()) updateCountdown(-3);
+
+    if (countdown_tmr < millis()) {
+        if (countdown && --countdown) {
+            countdown_tmr = millis() + TICK_TIME;
         } else {
             transitionTo(PICTURE);
             return;
