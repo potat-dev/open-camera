@@ -20,6 +20,7 @@ enum State {
 
 static State state = VIEWFINDER;
 
+// TODO: extract into class
 static uint8_t  countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
@@ -290,8 +291,19 @@ void drawCountdown() {
     canvas.drawString(buf, 320 / 2, 240 - 24);
 }
 
-void updateCountdown(uint8_t value) {
-    countdown     += value;
+int8_t getCountdownInc(int8_t amount) {
+    // if (countdown == 0) return amount;
+    // else if (countdown < amount) return amount * 2 - countdown;
+    // else return amount;
+
+    // TODO: negative amounts not working correctly
+    uint8_t inc = abs(amount);
+    if (countdown % inc) inc = inc * 2 - countdown % inc;
+    return amount < 0 ? -inc : inc;
+}
+
+void updateCountdown(int8_t amount) {
+    countdown     += getCountdownInc(amount);
     countdown_tmr  = millis() + TICK_TIME;
 }
 
@@ -302,11 +314,27 @@ void handleCountdown() {
     }
 
     // TODO: 3 -> 10 -> 15 -> 20 ...
+    // 0  - 5  | + 0 + 5
+    // 1  - 10 | + 4 + 5
+    // 2  - 10 | + 3 + 5
+    // 3  - 10 | + 2 + 5
+    // 4  - 10 | + 1 + 5
+    // 5  - 10 | + 0 + 5
+    // 6  - 15 | + 4 + 5
+    // 7  - 15 | + 3 + 5
+    // 8  - 15 | + 2 + 5
+    // 9  - 15 | + 1 + 5
+    // 10 - 15 | + 0 + 5
+    // 11 - 20 | + ...
+    // 12 - 20 | +
 
-    if (btnA.click()) updateCountdown(+5);
+    if (btnA.step() || btnA.click()) updateCountdown(+5);
+    if (btnB.step()) updateCountdown(-5);
 
-    if (btnA.step()) updateCountdown(+3);
-    if (btnB.step()) updateCountdown(-3);
+    if (btnB.click()) {
+        transitionTo(PICTURE);
+        return;
+    }
 
     if (countdown_tmr < millis()) {
         if (countdown && --countdown) {
