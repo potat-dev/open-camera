@@ -291,27 +291,10 @@ void drawCountdown() {
     canvas.drawString(buf, 320 / 2, 240 - 24);
 }
 
-int8_t getCountdownInc(int8_t amount) {
+uint8_t getCountdownInc(uint8_t amount) {
     // if (countdown == 0) return amount;
     // else if (countdown < amount) return amount * 2 - countdown;
     // else return amount;
-
-    // TODO: negative amounts not working correctly
-    uint8_t inc = abs(amount);
-    if (countdown % inc) inc = inc * 2 - countdown % inc;
-    return amount < 0 ? -inc : inc;
-}
-
-void updateCountdown(int8_t amount) {
-    countdown     += getCountdownInc(amount);
-    countdown_tmr  = millis() + TICK_TIME;
-}
-
-void handleCountdown() {
-    if (btnX.click()) {
-        transitionTo(VIEWFINDER);
-        return;
-    }
 
     // TODO: 3 -> 10 -> 15 -> 20 ...
     // 0  - 5  | + 0 + 5
@@ -327,6 +310,43 @@ void handleCountdown() {
     // 10 - 15 | + 0 + 5
     // 11 - 20 | + ...
     // 12 - 20 | +
+
+    // TODO: negative amounts not working correctly
+    // uint8_t inc = abs(amount);
+    // if (countdown % inc) inc = inc * 2 - countdown % inc;
+    // return amount < 0 ? -inc : inc;
+
+    return countdown % amount ? amount * 2 - countdown % amount : amount;
+}
+
+int8_t getCountdownDec(int8_t amount) {
+    // TODO: 3 -> 10 -> 15 -> 20 ...
+    // 0  - 0 | - 0 - 0
+    // 1  - 0 | - 1 - 0
+    // 2  - 0 | - 2 - 0
+    // 3  - 0 | - 3 - 0
+    // 4  - 0 | - 4 - 0
+    // 5  - 0 | - 0 - 5
+    // 6  - 0 | - 1 - 5
+    // 7  - 0 | - 2 - 5
+    // 8  - 0 | - 3 - 5
+    // 9  - 0 | - 4 - 5
+    // 10 - 5 | - 0 - 5
+    // 11 - 5 | - ...
+    // 12 - 5 | -
+    return countdown < amount ? countdown : amount + countdown % amount;
+}
+
+void updateCountdown(int8_t amount) {
+    countdown     += amount > 0 ? getCountdownInc(amount) : -getCountdownDec(-amount);
+    countdown_tmr  = millis() + TICK_TIME;
+}
+
+void handleCountdown() {
+    if (btnX.click()) {
+        transitionTo(VIEWFINDER);
+        return;
+    }
 
     if (btnA.step() || btnA.click()) updateCountdown(+5);
     if (btnB.step()) updateCountdown(-5);
