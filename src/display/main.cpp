@@ -291,21 +291,31 @@ void drawCountdown() {
     canvas.drawString(buf, 320 / 2, 240 - 24);
 }
 
-uint8_t getCountdownInc(uint8_t amount) {
-    // basically an optimized (overcomplicated) version of:
-    // ceil(countdown / amount) + 1) * amount
-    return countdown % amount ? amount * 2 - countdown % amount : amount;
-}
+int8_t getCountdownInc(int8_t amount) {
+    if (!amount) return 0;
+    uint8_t inc = abs(amount);
 
-int8_t getCountdownDec(int8_t amount) {
-    // basically an optimized (overcomplicated) version of:
-    // max(0, (floor(countdown / amount) - 1) * amount)
-    return countdown < amount ? countdown : amount + countdown % amount;
+    if (amount > 0) {
+        if (countdown % inc) inc = inc * 2 - countdown % inc;
+        return inc;
+    } else {
+        inc = countdown < inc ? countdown : inc + countdown % inc;
+        return -inc;
+    }
 }
 
 void updateCountdown(int8_t amount) {
-    countdown     += amount > 0 ? getCountdownInc(amount) : -getCountdownDec(-amount);
-    countdown_tmr  = millis() + TICK_TIME;
+    int16_t new_countdown = countdown + getCountdownInc(amount);
+
+    if (new_countdown > 250) {
+        countdown = 250;
+    } else if (new_countdown < 0) {
+        countdown = 0;
+    } else {
+        countdown = new_countdown;
+    }
+
+    countdown_tmr = millis() + TICK_TIME;
 }
 
 void handleCountdown() {
