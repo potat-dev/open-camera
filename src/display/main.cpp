@@ -209,6 +209,7 @@ void transitionTo(State next) {
 
         case COUNTDOWN:
             countdown = 0;
+            break;
 
         default:
             break;
@@ -305,17 +306,9 @@ int8_t getCountdownInc(int8_t amount) {
 }
 
 void updateCountdown(int8_t amount) {
-    int16_t new_countdown = countdown + getCountdownInc(amount);
-
-    if (new_countdown > 250) {
-        countdown = 250;
-    } else if (new_countdown < 0) {
-        countdown = 0;
-    } else {
-        countdown = new_countdown;
-    }
-
-    countdown_tmr = millis() + TICK_TIME;
+    int16_t updated = countdown + getCountdownInc(amount);
+    countdown       = constrain(updated, 0, TICK_COUNT_MAX);
+    countdown_tmr   = millis() + TICK_TIME;
 }
 
 void handleCountdown() {

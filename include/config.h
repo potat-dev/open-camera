@@ -44,9 +44,10 @@ constexpr uint8_t BTN_SHUTTER = 16;  // (not used rn)
 constexpr uint16_t DISPLAY_WIDTH  = 320;
 constexpr uint16_t DISPLAY_HEIGHT = 240;
 
-// countdown ticks
-constexpr uint16_t TICK_COUNT = 3;
-constexpr uint32_t TICK_TIME  = 750;
+// countdown params
+constexpr uint16_t TICK_COUNT     = 3;
+constexpr uint32_t TICK_TIME      = 1000;
+constexpr uint32_t TICK_COUNT_MAX = 250;
 
 // data transfer rate
 constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets
