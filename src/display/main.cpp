@@ -292,48 +292,14 @@ void drawCountdown() {
 }
 
 uint8_t getCountdownInc(uint8_t amount) {
-    // if (countdown == 0) return amount;
-    // else if (countdown < amount) return amount * 2 - countdown;
-    // else return amount;
-
-    // TODO: 3 -> 10 -> 15 -> 20 ...
-    // 0  - 5  | + 0 + 5
-    // 1  - 10 | + 4 + 5
-    // 2  - 10 | + 3 + 5
-    // 3  - 10 | + 2 + 5
-    // 4  - 10 | + 1 + 5
-    // 5  - 10 | + 0 + 5
-    // 6  - 15 | + 4 + 5
-    // 7  - 15 | + 3 + 5
-    // 8  - 15 | + 2 + 5
-    // 9  - 15 | + 1 + 5
-    // 10 - 15 | + 0 + 5
-    // 11 - 20 | + ...
-    // 12 - 20 | +
-
-    // TODO: negative amounts not working correctly
-    // uint8_t inc = abs(amount);
-    // if (countdown % inc) inc = inc * 2 - countdown % inc;
-    // return amount < 0 ? -inc : inc;
-
+    // basically an optimized (overcomplicated) version of:
+    // ceil(countdown / amount) + 1) * amount
     return countdown % amount ? amount * 2 - countdown % amount : amount;
 }
 
 int8_t getCountdownDec(int8_t amount) {
-    // TODO: 3 -> 10 -> 15 -> 20 ...
-    // 0  - 0 | - 0 - 0
-    // 1  - 0 | - 1 - 0
-    // 2  - 0 | - 2 - 0
-    // 3  - 0 | - 3 - 0
-    // 4  - 0 | - 4 - 0
-    // 5  - 0 | - 0 - 5
-    // 6  - 0 | - 1 - 5
-    // 7  - 0 | - 2 - 5
-    // 8  - 0 | - 3 - 5
-    // 9  - 0 | - 4 - 5
-    // 10 - 5 | - 0 - 5
-    // 11 - 5 | - ...
-    // 12 - 5 | -
+    // basically an optimized (overcomplicated) version of:
+    // max(0, (floor(countdown / amount) - 1) * amount)
     return countdown < amount ? countdown : amount + countdown % amount;
 }
 
