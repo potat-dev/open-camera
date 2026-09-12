@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <EncButton.h>
+#include <LittleFS.h>
 #include <LovyanGFX.h>
+#include <SD.h>
+#include <SPI.h>
 #include <esp_camera.h>
 #include <esp_timer.h>
 #include <fb_gfx.h>
@@ -24,6 +27,9 @@ static State state = VIEWFINDER;
 static uint8_t  countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
+// TODO: extract into photo manager class
+static uint16_t nextPhotoIndex = 1;
+
 // buttons
 
 Button btnA(BTN_A);
@@ -42,15 +48,18 @@ class LGFX_Display : public lgfx::LGFX_Device {
     LGFX_Display(void) {
         auto bus = bus_instance.config();
 
-        bus.pin_dc    = DISPLAY_DC;
-        bus.pin_sclk  = SPI_SCK;
-        bus.pin_mosi  = SPI_MOSI;
-        bus.pin_miso  = NOT_CONNECTED;
-        bus.spi_3wire = true;  // no MISO on this board
+        bus.pin_dc   = DISPLAY_DC;
+        bus.pin_sclk = SPI_SCK;
+        bus.pin_mosi = SPI_MOSI;
+
+        // should be NC and true because no MISO on this board
+        // but we need to init MISO here for shared SPI bus
+        bus.pin_miso  = SPI_MISO;
+        bus.spi_3wire = false;
 
         bus.spi_mode    = 0;
         bus.use_lock    = true;
-        bus.spi_host    = SPI2_HOST;
+        bus.spi_host    = SPI_HOST;
         bus.dma_channel = SPI_DMA_CH_AUTO;  // enable DMA transfers
         bus.freq_write  = DISPLAY_FREQ_WRITE;
         bus.freq_read   = DISPLAY_FREQ_READ;
@@ -64,12 +73,13 @@ class LGFX_Display : public lgfx::LGFX_Device {
         panel.pin_rst  = NOT_CONNECTED;
         panel.pin_busy = NOT_CONNECTED;
 
+        panel.bus_shared = true;
+
         // physical panel is portrait but we use it as landscape
         panel.panel_width     = DISPLAY_HEIGHT;
         panel.panel_height    = DISPLAY_WIDTH;
-        panel.offset_rotation = 1;  // landscape
-
-        panel.invert = true;  // invert colors
+        panel.offset_rotation = 1;     // landscape
+        panel.invert          = true;  // invert colors
 
         panel_instance.config(panel);
         setPanel(&panel_instance);
@@ -162,25 +172,98 @@ static void configure_camera() {
     enable_sde_bits(s, 0x07);
 }
 
+// SD card
+
+void findNextPhotoIndex() {
+    char path[32];
+    while (nextPhotoIndex < 10000) {
+        snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex);
+        if (!SD.exists(path)) {
+            break;
+        }
+        nextPhotoIndex++;
+    }
+    Serial.printf("Next photo will be: /pic_%04d.jpg\n", nextPhotoIndex);
+}
+
+bool mountSD(uint8_t max_attempts = 3, uint32_t retry_delay = 150) {
+    display.waitDMA();
+    digitalWrite(DISPLAY_CS, HIGH);
+    delay(5);
+
+    for (uint8_t attempt = 1; attempt <= max_attempts; attempt++) {
+        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
+        if (SD.begin(SD_CS, SPI, SD_CARD_SPI_FREQ)) return true;
+        SD.end();
+        digitalWrite(SD_CS, HIGH);
+        if (attempt < max_attempts) delay(retry_delay);
+    }
+
+    return false;
+}
+
+void unmountSD() {
+    SD.end();
+    digitalWrite(SD_CS, HIGH);
+}
+
+bool testSdCard() {
+    if (!mountSD()) {
+        Serial.println("Error: Failed to mount SD card");
+        return false;
+    }
+
+    File file = SD.open("/test.txt", FILE_WRITE, true);
+    if (!file) {
+        Serial.println("Error: Failed to open file");
+        unmountSD();
+        return false;
+    }
+
+    size_t size = file.println("Some Test String Demo File");
+    file.flush();
+    file.close();
+
+    Serial.printf("Size written: %u\n", (unsigned)size);
+
+    unmountSD();
+    return true;
+}
+
 void setup() {
     Serial.begin(115200);
-    Serial.setDebugOutput(false);
+    Serial.setDebugOutput(true);
+
+    delay(1500);  // stabilize SD card
+
+    // setup SPI pins
+    pinMode(DISPLAY_CS, OUTPUT);
+    digitalWrite(DISPLAY_CS, HIGH);
+
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, HIGH);
+
+    gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
+    pinMode(SPI_MISO, INPUT_PULLUP);
+
+    if (mountSD()) {
+        Serial.printf("SD Card detected. Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
+        findNextPhotoIndex();
+        unmountSD();
+    } else {
+        Serial.println("Error: Failed to mount SD card");
+        // TODO: reboot
+    }
 
     camera_config_t config = get_camera_config();
     if (esp_camera_init(&config) != ESP_OK) {
-        Serial.println("Camera init failed -- check wiring");
+        Serial.println("Camera initialization failed.");
         return;
     }
     configure_camera();
 
     display.init();
-
-#ifdef USE_LOW_POWER_SPI
-    gpio_set_drive_capability((gpio_num_t)SPI_SCK, GPIO_DRIVE_CAP_0);
-    gpio_set_drive_capability((gpio_num_t)SPI_MOSI, GPIO_DRIVE_CAP_0);
-#endif
-
-    display.setSwapBytes(false);  // RGB565 byte order
+    display.setSwapBytes(false);
 
     canvas.setPsram(true);
     canvas.setColorDepth(16);
@@ -227,6 +310,7 @@ void transitionTo(State next) {
         case PICTURE:
             drawFrame();
             updateDisplay();
+            testSdCard();
             break;
 
         default:
