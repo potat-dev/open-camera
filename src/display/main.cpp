@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <EncButton.h>
+#include <LittleFS.h>
 #include <LovyanGFX.h>
+#include <SD.h>
+#include <SPI.h>
 #include <esp_camera.h>
 #include <esp_timer.h>
 #include <fb_gfx.h>
@@ -50,7 +53,7 @@ class LGFX_Display : public lgfx::LGFX_Device {
 
         bus.spi_mode    = 0;
         bus.use_lock    = true;
-        bus.spi_host    = SPI2_HOST;
+        bus.spi_host    = SPI_HOST;
         bus.dma_channel = SPI_DMA_CH_AUTO;  // enable DMA transfers
         bus.freq_write  = DISPLAY_FREQ_WRITE;
         bus.freq_read   = DISPLAY_FREQ_READ;
@@ -64,12 +67,13 @@ class LGFX_Display : public lgfx::LGFX_Device {
         panel.pin_rst  = NOT_CONNECTED;
         panel.pin_busy = NOT_CONNECTED;
 
+        panel.bus_shared = true;
+
         // physical panel is portrait but we use it as landscape
         panel.panel_width     = DISPLAY_HEIGHT;
         panel.panel_height    = DISPLAY_WIDTH;
-        panel.offset_rotation = 1;  // landscape
-
-        panel.invert = true;  // invert colors
+        panel.offset_rotation = 1;     // landscape
+        panel.invert          = true;  // invert colors
 
         panel_instance.config(panel);
         setPanel(&panel_instance);
@@ -162,9 +166,51 @@ static void configure_camera() {
     enable_sde_bits(s, 0x07);
 }
 
+// SD card
+
+bool testSdCard() {
+    if (display.getStartCount() > 0) {
+        Serial.println("Closing Display");
+        display.endWrite();
+    }
+
+    SD.end();
+    delay(1000);
+
+    bool okSPI = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS);
+    if (!okSPI) {
+        Serial.println("SPI init failed");
+    }
+
+    bool okSD = okSPI && SD.begin(SD_CS, SPI, 4_MHz);
+    if (!okSD) {
+        Serial.println("SD init failed");
+        return false;
+    } else {
+        Serial.println("SD init success");
+    }
+
+    File file = SD.open("/test.txt", "w", true);
+    if (!file) {
+        Serial.println("File open failed");
+        return false;
+    } else {
+        Serial.println("File open success");
+    }
+
+    size_t size = file.println("Test");
+    Serial.print("Size written: ");
+    Serial.println(size);
+
+    file.close();
+    return true;
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(false);
+
+    testSdCard();
 
     camera_config_t config = get_camera_config();
     if (esp_camera_init(&config) != ESP_OK) {
@@ -227,6 +273,7 @@ void transitionTo(State next) {
         case PICTURE:
             drawFrame();
             updateDisplay();
+            testSdCard();
             break;
 
         default:

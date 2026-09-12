@@ -1,5 +1,7 @@
 #pragma once
 
+#include <SPI.h>
+
 #include "common.h"
 
 constexpr int16_t NOT_CONNECTED = -1;
@@ -53,3 +55,6 @@ constexpr uint32_t TICK_COUNT_MAX = 250;
 constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets
 constexpr uint32_t DISPLAY_FREQ_READ  = 16_MHz;
 constexpr uint32_t CAMERA_PCLK_FREQ   = 20_MHz;
+
+// SPI
+constexpr spi_host_device_t SPI_HOST = SPI2_HOST;
