@@ -27,6 +27,9 @@ static State state = VIEWFINDER;
 static uint8_t  countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
+// TODO: extract into photo manager class
+static uint16_t nextPhotoIndex = 1;
+
 // buttons
 
 Button btnA(BTN_A);
@@ -45,11 +48,14 @@ class LGFX_Display : public lgfx::LGFX_Device {
     LGFX_Display(void) {
         auto bus = bus_instance.config();
 
-        bus.pin_dc    = DISPLAY_DC;
-        bus.pin_sclk  = SPI_SCK;
-        bus.pin_mosi  = SPI_MOSI;
-        bus.pin_miso  = NOT_CONNECTED;
-        bus.spi_3wire = true;  // no MISO on this board
+        bus.pin_dc   = DISPLAY_DC;
+        bus.pin_sclk = SPI_SCK;
+        bus.pin_mosi = SPI_MOSI;
+
+        // should be NC and true because no MISO on this board
+        // but we need to init MISO here for shared SPI bus
+        bus.pin_miso  = SPI_MISO;
+        bus.spi_3wire = true;
 
         bus.spi_mode    = 0;
         bus.use_lock    = true;
@@ -168,41 +174,36 @@ static void configure_camera() {
 
 // SD card
 
+void findNextPhotoIndex() {
+    char path[32];
+    while (nextPhotoIndex < 10000) {
+        snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex);
+        if (!SD.exists(path)) {
+            break;
+        }
+        nextPhotoIndex++;
+    }
+    Serial.printf("Next photo will be: /pic_%04d.jpg\n", nextPhotoIndex);
+}
+
 bool testSdCard() {
-    if (display.getStartCount() > 0) {
-        Serial.println("Closing Display");
-        display.endWrite();
-    }
+    display.waitDMA();
+    digitalWrite(DISPLAY_CS, HIGH);
 
-    SD.end();
-    delay(1000);
-
-    bool okSPI = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, SD_CS);
-    if (!okSPI) {
-        Serial.println("SPI init failed");
-    }
-
-    bool okSD = okSPI && SD.begin(SD_CS, SPI, 4_MHz);
-    if (!okSD) {
-        Serial.println("SD init failed");
-        return false;
-    } else {
-        Serial.println("SD init success");
-    }
-
-    File file = SD.open("/test.txt", "w", true);
+    File file = SD.open("/test.txt", FILE_WRITE, true);
     if (!file) {
-        Serial.println("File open failed");
+        Serial.println("FAILED to create file!");
+        digitalWrite(SD_CS, HIGH);
         return false;
-    } else {
-        Serial.println("File open success");
     }
 
-    size_t size = file.println("Test");
+    size_t size = file.println("Test string blah blah");
+    file.close();
+
     Serial.print("Size written: ");
     Serial.println(size);
 
-    file.close();
+    digitalWrite(SD_CS, HIGH);
     return true;
 }
 
@@ -210,7 +211,26 @@ void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(false);
 
-    testSdCard();
+    pinMode(DISPLAY_CS, OUTPUT);
+    digitalWrite(DISPLAY_CS, HIGH);
+
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, HIGH);
+    pinMode(SPI_MISO, INPUT_PULLUP);
+
+    display.init();
+
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+
+    // reset hung SD card
+    for (uint8_t i = 0; i < 16; i++) SPI.transfer(0xFF);
+
+    if (SD.begin(SD_CS, SPI, SD_CARD_SPI_FREQ)) {
+        Serial.println("SD Card mounted successfully");
+        findNextPhotoIndex();
+    } else {
+        Serial.println("WARNING: SD Card mount failed! Photos will not save.");
+    }
 
     camera_config_t config = get_camera_config();
     if (esp_camera_init(&config) != ESP_OK) {
@@ -218,8 +238,6 @@ void setup() {
         return;
     }
     configure_camera();
-
-    display.init();
 
 #ifdef USE_LOW_POWER_SPI
     gpio_set_drive_capability((gpio_num_t)SPI_SCK, GPIO_DRIVE_CAP_0);
