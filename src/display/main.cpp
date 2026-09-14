@@ -190,6 +190,11 @@ bool testSdCard() {
     // 1. Wait for display DMA to complete and ensure display CS is de-asserted
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
+    delay(10);
+
+    // force SPI2_HOST register out of DMA mode
+    SPI.beginTransaction(SPISettings(10_MHz, MSBFIRST, SPI_MODE0));
+    SPI.endTransaction();
 
     // 2. Attempt to open file
     File file = SD.open("/test.txt", FILE_WRITE, true);
@@ -198,8 +203,10 @@ bool testSdCard() {
     if (!file) {
         Serial.println("Warning: File open failed, re-synchronizing card interface...");
         digitalWrite(SD_CS, HIGH);
+        SD.end();
         delay(50);
 
+        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
         // Calling SD.begin clears STA_NOINIT and puts the card back into TRAN state
         if (SD.begin(SD_CS, SPI, 10_MHz)) {
             file = SD.open("/test.txt", FILE_WRITE, true);
@@ -227,7 +234,7 @@ bool testSdCard() {
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);  // Allow supply rails to stabilize
+    delay(1500);  // Allow supply rails to stabilize
 
     Serial.setDebugOutput(true);
 
@@ -247,7 +254,7 @@ void setup() {
 
     // 2. Initialize SPI bus with software CS (-1)
     Serial.print("[1] Initializing Arduino SPI bus... ");
-    bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+    bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
     Serial.println(spiOk ? "OK" : "FAILED");
 
     // 3. Issue warm-boot recovery clocks
