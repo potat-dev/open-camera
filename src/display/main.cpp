@@ -191,9 +191,13 @@ bool testSdCard() {
     digitalWrite(DISPLAY_CS, HIGH);
 
     // wake up card (TODO: create helper)
-    SPI.beginTransaction(SPISettings(20_MHz, MSBFIRST, SPI_MODE0));
+    SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
+    SPI.transfer(0xFF);
+    SPI.transfer(0xFF);
+    SPI.transfer(0xFF);
     SPI.transfer(0xFF);
     SPI.endTransaction();
+    delayMicroseconds(20);
 
     File file = SD.open("/test.txt", FILE_WRITE, true);
     if (!file) {
@@ -233,6 +237,8 @@ void setup() {
 
     pinMode(SD_CS, OUTPUT);
     digitalWrite(SD_CS, HIGH);
+
+    gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
     // 4. Test Arduino SPI initialization
@@ -249,8 +255,8 @@ void setup() {
     SPI.endTransaction();
 
     // 6. Test SD Mount at standard 4 MHz (not an unverified macro)
-    Serial.print("[3] Mounting SD card at 20 MHz... ");
-    bool sdOk = SD.begin(SD_CS, SPI, 20000000);
+    Serial.print("[3] Mounting SD card at 10 MHz... ");
+    bool sdOk = SD.begin(SD_CS, SPI, 10_MHz);
     if (sdOk) {
         Serial.println("SUCCESS!");
         Serial.printf("    Card Type: %d, Size: %llu MB\n", SD.cardType(),
