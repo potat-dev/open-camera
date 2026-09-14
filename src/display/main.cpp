@@ -187,27 +187,38 @@ void findNextPhotoIndex() {
 }
 
 bool testSdCard() {
-    // 1. Wait for display DMA to complete and ensure display CS is de-asserted
+    // 1. Ensure active display DMA transfer is complete
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
-    delay(10);
 
-    // force SPI2_HOST register out of DMA mode
+    // 2. Hardware bus re-synchronization:
+    // With all CS lines HIGH, actively shift one byte in Mode 0 at 10 MHz.
+    // This forces the ESP32 SPI hardware to physically drive SCK to 0V (CPOL=0),
+    // eliminating the clock edge glitch when SD_CS is asserted.
     SPI.beginTransaction(SPISettings(10_MHz, MSBFIRST, SPI_MODE0));
+    SPI.transfer(0xFF);
     SPI.endTransaction();
 
-    // 2. Attempt to open file
+    // 3. Pre-select pulse:
+    // Assert SD_CS briefly to wake the card's SPI receiver from standby,
+    // ensuring CMD13 receives an immediate 0x00 response from the controller.
+    digitalWrite(SD_CS, LOW);
+    delayMicroseconds(10);
+    digitalWrite(SD_CS, HIGH);
+    delayMicroseconds(10);
+
+    // 4. Perform file operation
     File file = SD.open("/test.txt", FILE_WRITE, true);
 
-    // 3. Auto-recovery: If ff_sd_status set STA_NOINIT, re-initialize and retry once
+    // 5. Clean recovery fallback
     if (!file) {
-        Serial.println("Warning: File open failed, re-synchronizing card interface...");
+        Serial.println("Warning: File open failed, executing clean re-mount...");
         digitalWrite(SD_CS, HIGH);
+
         SD.end();
         delay(50);
 
-        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
-        // Calling SD.begin clears STA_NOINIT and puts the card back into TRAN state
+        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
         if (SD.begin(SD_CS, SPI, 10_MHz)) {
             file = SD.open("/test.txt", FILE_WRITE, true);
         }
@@ -226,9 +237,7 @@ bool testSdCard() {
     Serial.print("Size written: ");
     Serial.println(size);
 
-    // 4. Ensure SD CS is high. Do not issue trailing clocks here.
     digitalWrite(SD_CS, HIGH);
-
     return true;
 }
 
