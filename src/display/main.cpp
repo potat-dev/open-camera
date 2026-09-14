@@ -55,7 +55,7 @@ class LGFX_Display : public lgfx::LGFX_Device {
         // should be NC and true because no MISO on this board
         // but we need to init MISO here for shared SPI bus
         bus.pin_miso  = SPI_MISO;
-        bus.spi_3wire = true;
+        bus.spi_3wire = false;
 
         bus.spi_mode    = 0;
         bus.use_lock    = true;
@@ -190,6 +190,11 @@ bool testSdCard() {
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
 
+    // wake up card (TODO: create helper)
+    SPI.beginTransaction(SPISettings(20_MHz, MSBFIRST, SPI_MODE0));
+    SPI.transfer(0xFF);
+    SPI.endTransaction();
+
     File file = SD.open("/test.txt", FILE_WRITE, true);
     if (!file) {
         Serial.println("FAILED to create file!");
@@ -198,19 +203,31 @@ bool testSdCard() {
     }
 
     size_t size = file.println("Test string blah blah");
+    file.flush();
     file.close();
 
     Serial.print("Size written: ");
     Serial.println(size);
 
     digitalWrite(SD_CS, HIGH);
+    SPI.transfer(0xFF);  // detach SD card
+
     return true;
 }
 
 void setup() {
     Serial.begin(115200);
-    Serial.setDebugOutput(false);
+    // 1. Give serial monitor time to attach and SD card power rails time to stabilize
+    delay(1000);
 
+    // 2. ENABLE verbose ESP-IDF driver logs so we see the exact failure code
+    Serial.setDebugOutput(true);
+
+    Serial.println("\n\n========================================");
+    Serial.println("         STEP-BY-STEP SPI DEBUG         ");
+    Serial.println("========================================");
+
+    // 3. Set both CS lines HIGH immediately
     pinMode(DISPLAY_CS, OUTPUT);
     digitalWrite(DISPLAY_CS, HIGH);
 
@@ -218,37 +235,53 @@ void setup() {
     digitalWrite(SD_CS, HIGH);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    display.init();
+    // 4. Test Arduino SPI initialization
+    Serial.print("[1] Initializing Arduino SPI bus... ");
+    bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+    Serial.println(spiOk ? "OK" : "FAILED (Host already in use or pin conflict!)");
 
-    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+    // 5. Send dummy clocks with CS HIGH
+    Serial.println("[2] Sending 16 dummy bytes with CS HIGH...");
+    SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
+    for (uint8_t i = 0; i < 16; i++) {
+        SPI.transfer(0xFF);
+    }
+    SPI.endTransaction();
 
-    // reset hung SD card
-    for (uint8_t i = 0; i < 16; i++) SPI.transfer(0xFF);
-
-    if (SD.begin(SD_CS, SPI, SD_CARD_SPI_FREQ)) {
-        Serial.println("SD Card mounted successfully");
+    // 6. Test SD Mount at standard 4 MHz (not an unverified macro)
+    Serial.print("[3] Mounting SD card at 20 MHz... ");
+    bool sdOk = SD.begin(SD_CS, SPI, 20000000);
+    if (sdOk) {
+        Serial.println("SUCCESS!");
+        Serial.printf("    Card Type: %d, Size: %llu MB\n", SD.cardType(),
+                      SD.cardSize() / (1024 * 1024));
         findNextPhotoIndex();
     } else {
-        Serial.println("WARNING: SD Card mount failed! Photos will not save.");
+        Serial.println("FAILED!");
     }
 
+    // 7. Initialize Camera
+    Serial.print("[4] Initializing Camera... ");
     camera_config_t config = get_camera_config();
-    if (esp_camera_init(&config) != ESP_OK) {
-        Serial.println("Camera init failed -- check wiring");
-        return;
+    esp_err_t       camErr = esp_camera_init(&config);
+    if (camErr != ESP_OK) {
+        Serial.printf("FAILED with error 0x%x\n", camErr);
+    } else {
+        Serial.println("OK");
+        configure_camera();
     }
-    configure_camera();
 
-#ifdef USE_LOW_POWER_SPI
-    gpio_set_drive_capability((gpio_num_t)SPI_SCK, GPIO_DRIVE_CAP_0);
-    gpio_set_drive_capability((gpio_num_t)SPI_MOSI, GPIO_DRIVE_CAP_0);
-#endif
-
-    display.setSwapBytes(false);  // RGB565 byte order
+    // 8. Initialize Display LAST
+    Serial.print("[5] Initializing Display... ");
+    display.init();
+    display.setSwapBytes(false);
+    Serial.println("OK");
 
     canvas.setPsram(true);
     canvas.setColorDepth(16);
     canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+    Serial.println("========================================\n");
 }
 
 void drawFrame() {
