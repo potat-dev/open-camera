@@ -187,19 +187,25 @@ void findNextPhotoIndex() {
 }
 
 bool testSdCard() {
+    // 1. Wait for display DMA to complete and ensure display CS is de-asserted
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
 
-    // wake up card (TODO: create helper)
-    SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
-    SPI.transfer(0xFF);
-    SPI.transfer(0xFF);
-    SPI.transfer(0xFF);
-    SPI.transfer(0xFF);
-    SPI.endTransaction();
-    delayMicroseconds(20);
-
+    // 2. Attempt to open file
     File file = SD.open("/test.txt", FILE_WRITE, true);
+
+    // 3. Auto-recovery: If ff_sd_status set STA_NOINIT, re-initialize and retry once
+    if (!file) {
+        Serial.println("Warning: File open failed, re-synchronizing card interface...");
+        digitalWrite(SD_CS, HIGH);
+        delay(50);
+
+        // Calling SD.begin clears STA_NOINIT and puts the card back into TRAN state
+        if (SD.begin(SD_CS, SPI, 10_MHz)) {
+            file = SD.open("/test.txt", FILE_WRITE, true);
+        }
+    }
+
     if (!file) {
         Serial.println("FAILED to create file!");
         digitalWrite(SD_CS, HIGH);
@@ -213,25 +219,23 @@ bool testSdCard() {
     Serial.print("Size written: ");
     Serial.println(size);
 
+    // 4. Ensure SD CS is high. Do not issue trailing clocks here.
     digitalWrite(SD_CS, HIGH);
-    SPI.transfer(0xFF);  // detach SD card
 
     return true;
 }
 
 void setup() {
     Serial.begin(115200);
-    // 1. Give serial monitor time to attach and SD card power rails time to stabilize
-    delay(1000);
+    delay(1000);  // Allow supply rails to stabilize
 
-    // 2. ENABLE verbose ESP-IDF driver logs so we see the exact failure code
     Serial.setDebugOutput(true);
 
     Serial.println("\n\n========================================");
     Serial.println("         STEP-BY-STEP SPI DEBUG         ");
     Serial.println("========================================");
 
-    // 3. Set both CS lines HIGH immediately
+    // 1. Immediately de-assert CS lines
     pinMode(DISPLAY_CS, OUTPUT);
     digitalWrite(DISPLAY_CS, HIGH);
 
@@ -241,22 +245,29 @@ void setup() {
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    // 4. Test Arduino SPI initialization
+    // 2. Initialize SPI bus with software CS (-1)
     Serial.print("[1] Initializing Arduino SPI bus... ");
     bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
-    Serial.println(spiOk ? "OK" : "FAILED (Host already in use or pin conflict!)");
+    Serial.println(spiOk ? "OK" : "FAILED");
 
-    // 5. Send dummy clocks with CS HIGH
-    Serial.println("[2] Sending 16 dummy bytes with CS HIGH...");
+    // 3. Issue warm-boot recovery clocks
+    Serial.println("[2] Sending dummy clocks with CS HIGH...");
     SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
-    for (uint8_t i = 0; i < 16; i++) {
+    for (uint8_t i = 0; i < 32; i++) {
         SPI.transfer(0xFF);
     }
     SPI.endTransaction();
 
-    // 6. Test SD Mount at standard 4 MHz (not an unverified macro)
+    // 4. Mount SD card with retry logic for warm resets
     Serial.print("[3] Mounting SD card at 10 MHz... ");
-    bool sdOk = SD.begin(SD_CS, SPI, 10_MHz);
+    bool sdOk = false;
+    for (uint8_t attempt = 1; attempt <= 3; attempt++) {
+        sdOk = SD.begin(SD_CS, SPI, 10_MHz);
+        if (sdOk) break;
+        Serial.printf("retry %d... ", attempt);
+        delay(150);
+    }
+
     if (sdOk) {
         Serial.println("SUCCESS!");
         Serial.printf("    Card Type: %d, Size: %llu MB\n", SD.cardType(),
@@ -266,18 +277,18 @@ void setup() {
         Serial.println("FAILED!");
     }
 
-    // 7. Initialize Camera
+    // 5. Initialize camera
     Serial.print("[4] Initializing Camera... ");
     camera_config_t config = get_camera_config();
     esp_err_t       camErr = esp_camera_init(&config);
     if (camErr != ESP_OK) {
         Serial.printf("FAILED with error 0x%x\n", camErr);
-    } else {
-        Serial.println("OK");
-        configure_camera();
+        return;
     }
+    Serial.println("OK");
+    configure_camera();
 
-    // 8. Initialize Display LAST
+    // 6. Initialize display at 80 MHz
     Serial.print("[5] Initializing Display... ");
     display.init();
     display.setSwapBytes(false);
