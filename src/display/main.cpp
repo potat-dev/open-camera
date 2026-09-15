@@ -186,88 +186,48 @@ void findNextPhotoIndex() {
     Serial.printf("Next photo will be: /pic_%04d.jpg\n", nextPhotoIndex);
 }
 
-// Sends a raw command in SPI mode and returns the R1 response
-static uint8_t sendRawCmd(uint8_t cmd, uint32_t arg, uint8_t crc) {
-    SPI.transfer(0x40 | cmd);
-    SPI.transfer((arg >> 24) & 0xFF);
-    SPI.transfer((arg >> 16) & 0xFF);
-    SPI.transfer((arg >> 8) & 0xFF);
-    SPI.transfer(arg & 0xFF);
-    SPI.transfer(crc);
-
-    uint8_t res = 0xFF;
-    for (int i = 0; i < 16; i++) {
-        res = SPI.transfer(0xFF);
-        if ((res & 0x80) == 0) break;
-    }
-    return res;
-}
-
 bool testSdCard() {
     // 1. Conclude display operations
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
-
-    // 2. Bus settling delay after display DMA
     delay(5);
 
-    // 3. Re-align SPI2_HOST to Mode 0 at 10 MHz
-    SPI.beginTransaction(SPISettings(10_MHz, MSBFIRST, SPI_MODE0));
-    SPI.transfer(0xFF);
-
-    // 4. Wake the card from idle power-save into active transfer state.
-    // This prevents CMD13 in ff_sd_status() from returning 0x01 (Idle),
-    // eliminating the "Check status failed" error entirely.
-    digitalWrite(SD_CS, LOW);
-    sendRawCmd(55, 0, 0x65);                       // CMD55: APP_CMD prefix
-    uint8_t r = sendRawCmd(41, 0x40000000, 0x77);  // ACMD41: HCS=1
-    digitalWrite(SD_CS, HIGH);
-    SPI.transfer(0xFF);  // 8 clocks to release MISO
-    SPI.endTransaction();
-
-    // 5. Perform file I/O
-    File file = SD.open("/test.txt", FILE_WRITE, true);
-
-    // Recovery path in case of an unexpected bus stall
-    if (!file) {
-        Serial.println("Warning: File open failed, executing clean re-mount...");
-        digitalWrite(SD_CS, HIGH);
-
-        SD.end();
-        delay(20);
-
-        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
-        if (SD.begin(SD_CS, SPI, 10_MHz)) {
-            file = SD.open("/test.txt", FILE_WRITE, true);
-        }
-    }
-
-    if (!file) {
-        Serial.println("FAILED to create file!");
+    // 2. Mount SD card on demand
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+    if (!SD.begin(SD_CS, SPI, 10_MHz)) {
+        Serial.println("Error: Failed to mount SD card on demand.");
         digitalWrite(SD_CS, HIGH);
         return false;
     }
 
-    size_t size = file.println("Test string blah blah");
+    // 3. Perform file operation (guaranteed clean state)
+    File file = SD.open("/test.txt", FILE_WRITE, true);
+    if (!file) {
+        Serial.println("Error: Failed to open file.");
+        SD.end();
+        digitalWrite(SD_CS, HIGH);
+        return false;
+    }
+
+    size_t size = file.println("Test string execution verified.");
     file.flush();
     file.close();
 
-    Serial.print("Size written: ");
-    Serial.println(size);
+    Serial.printf("Size written: %u\n", (unsigned)size);
 
+    // 4. Cleanly unmount and isolate card before resuming 80 MHz display
+    SD.end();
     digitalWrite(SD_CS, HIGH);
     return true;
 }
 
 void setup() {
     Serial.begin(115200);
+
+    // 1400 ms allows this card's controller to finish internal POST
     delay(1500);
 
-    Serial.setDebugOutput(true);
-
-    Serial.println("\n\n========================================");
-    Serial.println("         STEP-BY-STEP SPI DEBUG         ");
-    Serial.println("========================================");
+    Serial.setDebugOutput(true);  // Silence internal ESP-IDF driver debug noise
 
     // 1. Immediately de-assert chip select lines
     pinMode(DISPLAY_CS, OUTPUT);
@@ -279,79 +239,33 @@ void setup() {
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    // 2. Initialize SPI bus with software CS (-1)
-    Serial.print("[1] Initializing Arduino SPI bus... ");
-    bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
-    Serial.println(spiOk ? "OK" : "FAILED");
+    // 2. Initialize SPI bus
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
 
-    // 3. Hardware warm-boot recovery sequence:
-    // Forces the SD card controller out of any interrupted data state left by esptool or warm
-    // reset.
-    Serial.println("[2] Executing warm-reset bus recovery...");
-    SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
-
-    // A. Issue CMD12 (STOP_TRANSMISSION) with CS LOW to abort any dangling transfer
-    digitalWrite(SD_CS, LOW);
-    sendRawCmd(12, 0, 0x61);
-    for (int i = 0; i < 16; i++) SPI.transfer(0xFF);
-
-    // B. De-assert CS and send 80 clocks (10 bytes) at 400 kHz
-    digitalWrite(SD_CS, HIGH);
-    for (int i = 0; i < 16; i++) SPI.transfer(0xFF);
-
-    // C. Wait for card to release MISO (clear busy)
-    digitalWrite(SD_CS, LOW);
-    uint32_t t0 = millis();
-    while (SPI.transfer(0xFF) != 0xFF && (millis() - t0 < 300));
-    digitalWrite(SD_CS, HIGH);
-
-    // D. Mandatory 80 dummy clock cycles with CS HIGH per SD Specification
-    for (int i = 0; i < 16; i++) SPI.transfer(0xFF);
-
-    SPI.endTransaction();
-
-    // 4. Mount SD card at 10 MHz with retry logic
-    Serial.print("[3] Mounting SD card at 10 MHz... ");
-    bool sdOk = false;
-    for (uint8_t attempt = 1; attempt <= 3; attempt++) {
-        sdOk = SD.begin(SD_CS, SPI, 10_MHz);
-        if (sdOk) break;
-
-        Serial.printf("retry %d... ", attempt);
-        delay(100);
-    }
-
-    if (sdOk) {
-        Serial.println("SUCCESS!");
-        Serial.printf("    Card Type: %d, Size: %llu MB\n", SD.cardType(),
-                      SD.cardSize() / (1024 * 1024));
+    // 3. Scan photo index on boot, then unmount
+    if (SD.begin(SD_CS, SPI, 10_MHz)) {
+        Serial.printf("SD Card detected. Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
         findNextPhotoIndex();
+        SD.end();  // Isolate card from display traffic until first photo
     } else {
-        Serial.println("FAILED!");
+        Serial.println("Warning: SD card not detected on boot.");
     }
 
-    // 5. Initialize Camera
-    Serial.print("[4] Initializing Camera... ");
+    // 4. Initialize Camera
     camera_config_t config = get_camera_config();
-    esp_err_t       camErr = esp_camera_init(&config);
-    if (camErr != ESP_OK) {
-        Serial.printf("FAILED with error 0x%x\n", camErr);
+    if (esp_camera_init(&config) != ESP_OK) {
+        Serial.println("Camera initialization failed.");
         return;
     }
-    Serial.println("OK");
     configure_camera();
 
-    // 6. Initialize Display at 80 MHz
-    Serial.print("[5] Initializing Display... ");
+    // 5. Initialize Display at 80 MHz
     display.init();
     display.setSwapBytes(false);
-    Serial.println("OK");
 
     canvas.setPsram(true);
     canvas.setColorDepth(16);
     canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-    Serial.println("========================================\n");
 }
 
 void drawFrame() {
