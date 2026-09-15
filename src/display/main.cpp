@@ -248,15 +248,24 @@ bool saveImage(const char* filename, const uint8_t* data, size_t size) {
     file.flush();
     file.close();
 
+    unmountSD();
     return size_written == size;
 }
 
 void capture() {
     ESP_LOGI("capture", "Capture start");
 
-    camera_init(MODE_CAPTURE);
+    bool ok = camera_init(MODE_CAPTURE);
+    if (!ok) {
+        Serial.println("Camera init failed");
+        return;
+    }
 
-    camera_fb_t* raw_data = esp_camera_fb_get();  // TODO: fix green tint (drop first frame)
+    // drop 1 dummy frame
+    camera_fb_t* raw_data = esp_camera_fb_get();
+    if (raw_data) esp_camera_fb_return(raw_data);
+
+    raw_data = esp_camera_fb_get();
     if (!raw_data) {
         Serial.println("Capture failed");
         return;
@@ -267,11 +276,12 @@ void capture() {
     uint8_t* data = NULL;
     size_t   size = 0;
 
-    bool converted = frame2jpg(raw_data, CAMERA_JPEG_QUALITY, &data, &size);
+    ok = frame2jpg(raw_data, CAMERA_JPEG_QUALITY, &data, &size);
     esp_camera_fb_return(raw_data);
 
-    if (!converted) {
+    if (!ok || !data) {
         Serial.println("JPEG compression failed");
+        if (data) free(data);
         return;
     }
 
@@ -280,8 +290,10 @@ void capture() {
     char path[32];
     snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex++);
 
-    bool saveOK = saveImage(path, data, size);
-    if (!saveOK) {
+    ok = saveImage(path, data, size);
+    free(data);
+
+    if (!ok) {
         Serial.println("Save failed");
         return;
     }
