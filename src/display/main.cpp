@@ -255,6 +255,7 @@ bool saveImage(const char* filename, const uint8_t* data, size_t size) {
 void capture() {
     ESP_LOGI("capture", "Capture start");
 
+    // TODO: also capture and save viewfinder frame with some .raw ext
     bool ok = camera_init(MODE_CAPTURE);
     if (!ok) {
         Serial.println("Camera init failed");
@@ -262,6 +263,7 @@ void capture() {
     }
 
     // drop 1 dummy frame
+    // TODO: probably need more (needs testing)
     camera_fb_t* raw_data = esp_camera_fb_get();
     if (raw_data) esp_camera_fb_return(raw_data);
 
@@ -276,6 +278,8 @@ void capture() {
     uint8_t* data = NULL;
     size_t   size = 0;
 
+    // TODO: rewrite to frame2jpg_cb
+    // because frame2jpg has 128kb buffer limit
     ok = frame2jpg(raw_data, CAMERA_JPEG_QUALITY, &data, &size);
     esp_camera_fb_return(raw_data);
 
