@@ -186,50 +186,57 @@ void findNextPhotoIndex() {
     Serial.printf("Next photo will be: /pic_%04d.jpg\n", nextPhotoIndex);
 }
 
-bool testSdCard() {
-    // 1. Conclude display operations
+bool mountSD(uint8_t max_attempts = 3, uint32_t retry_delay = 150) {
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
     delay(5);
 
-    // 2. Mount SD card on demand
-    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
-    if (!SD.begin(SD_CS, SPI, 10_MHz)) {
-        Serial.println("Error: Failed to mount SD card on demand.");
-        digitalWrite(SD_CS, HIGH);
-        return false;
-    }
-
-    // 3. Perform file operation (guaranteed clean state)
-    File file = SD.open("/test.txt", FILE_WRITE, true);
-    if (!file) {
-        Serial.println("Error: Failed to open file.");
+    for (uint8_t attempt = 1; attempt <= max_attempts; attempt++) {
+        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
+        if (SD.begin(SD_CS, SPI, SD_CARD_SPI_FREQ)) return true;
         SD.end();
         digitalWrite(SD_CS, HIGH);
+        if (attempt < max_attempts) delay(retry_delay);
+    }
+
+    return false;
+}
+
+void unmountSD() {
+    SD.end();
+    digitalWrite(SD_CS, HIGH);
+}
+
+bool testSdCard() {
+    if (!mountSD()) {
+        Serial.println("Error: Failed to mount SD card");
         return false;
     }
 
-    size_t size = file.println("Test string execution verified.");
+    File file = SD.open("/test.txt", FILE_WRITE, true);
+    if (!file) {
+        Serial.println("Error: Failed to open file");
+        unmountSD();
+        return false;
+    }
+
+    size_t size = file.println("Some Test String Demo File");
     file.flush();
     file.close();
 
     Serial.printf("Size written: %u\n", (unsigned)size);
 
-    // 4. Cleanly unmount and isolate card before resuming 80 MHz display
-    SD.end();
-    digitalWrite(SD_CS, HIGH);
+    unmountSD();
     return true;
 }
 
 void setup() {
     Serial.begin(115200);
+    Serial.setDebugOutput(true);
 
-    // 1400 ms allows this card's controller to finish internal POST
-    delay(1500);
+    delay(1500);  // stabilize SD card
 
-    Serial.setDebugOutput(true);  // Silence internal ESP-IDF driver debug noise
-
-    // 1. Immediately de-assert chip select lines
+    // setup SPI pins
     pinMode(DISPLAY_CS, OUTPUT);
     digitalWrite(DISPLAY_CS, HIGH);
 
@@ -239,19 +246,15 @@ void setup() {
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    // 2. Initialize SPI bus
-    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
-
-    // 3. Scan photo index on boot, then unmount
-    if (SD.begin(SD_CS, SPI, 10_MHz)) {
+    if (mountSD()) {
         Serial.printf("SD Card detected. Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
         findNextPhotoIndex();
-        SD.end();  // Isolate card from display traffic until first photo
+        unmountSD();
     } else {
-        Serial.println("Warning: SD card not detected on boot.");
+        Serial.println("Error: Failed to mount SD card");
+        // TODO: reboot
     }
 
-    // 4. Initialize Camera
     camera_config_t config = get_camera_config();
     if (esp_camera_init(&config) != ESP_OK) {
         Serial.println("Camera initialization failed.");
@@ -259,7 +262,6 @@ void setup() {
     }
     configure_camera();
 
-    // 5. Initialize Display at 80 MHz
     display.init();
     display.setSwapBytes(false);
 
