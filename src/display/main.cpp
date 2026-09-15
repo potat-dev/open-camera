@@ -187,37 +187,32 @@ void findNextPhotoIndex() {
 }
 
 bool testSdCard() {
-    // 1. Ensure active display DMA transfer is complete
+    // 1. Conclude active display DMA operations
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
 
-    // 2. Hardware bus re-synchronization:
-    // With all CS lines HIGH, actively shift one byte in Mode 0 at 10 MHz.
-    // This forces the ESP32 SPI hardware to physically drive SCK to 0V (CPOL=0),
-    // eliminating the clock edge glitch when SD_CS is asserted.
-    SPI.beginTransaction(SPISettings(10_MHz, MSBFIRST, SPI_MODE0));
-    SPI.transfer(0xFF);
-    SPI.endTransaction();
+    // 2. Bus settling delay
+    delay(5);
 
-    // 3. Pre-select pulse:
-    // Assert SD_CS briefly to wake the card's SPI receiver from standby,
-    // ensuring CMD13 receives an immediate 0x00 response from the controller.
-    digitalWrite(SD_CS, LOW);
-    delayMicroseconds(10);
+    // 3. Re-assert Arduino SPI bus configuration over SPI2_HOST.
+    // This cleans up register states left by LovyanGFX's 80 MHz DMA.
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+
+    // 4. Ensure MISO is released by clocking until line is 0xFF
     digitalWrite(SD_CS, HIGH);
-    delayMicroseconds(10);
+    uint32_t t0 = millis();
+    while (SPI.transfer(0xFF) != 0xFF) {
+        if (millis() - t0 > 200) break;
+    }
 
-    // 4. Perform file operation
+    // 5. Open and write file
     File file = SD.open("/test.txt", FILE_WRITE, true);
 
-    // 5. Clean recovery fallback
+    // Recovery path in the event of an unexpected bus stall
     if (!file) {
-        Serial.println("Warning: File open failed, executing clean re-mount...");
         digitalWrite(SD_CS, HIGH);
-
         SD.end();
-        delay(50);
-
+        delay(20);
         SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
         if (SD.begin(SD_CS, SPI, 10_MHz)) {
             file = SD.open("/test.txt", FILE_WRITE, true);
@@ -243,7 +238,7 @@ bool testSdCard() {
 
 void setup() {
     Serial.begin(115200);
-    delay(1500);  // Allow supply rails to stabilize
+    delay(1000);
 
     Serial.setDebugOutput(true);
 
@@ -251,7 +246,7 @@ void setup() {
     Serial.println("         STEP-BY-STEP SPI DEBUG         ");
     Serial.println("========================================");
 
-    // 1. Immediately de-assert CS lines
+    // 1. De-assert chip select lines
     pinMode(DISPLAY_CS, OUTPUT);
     digitalWrite(DISPLAY_CS, HIGH);
 
@@ -261,27 +256,38 @@ void setup() {
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    // 2. Initialize SPI bus with software CS (-1)
+    // 2. Initialize SPI bus
     Serial.print("[1] Initializing Arduino SPI bus... ");
-    bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
+    bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
     Serial.println(spiOk ? "OK" : "FAILED");
 
-    // 3. Issue warm-boot recovery clocks
-    Serial.println("[2] Sending dummy clocks with CS HIGH...");
+    // 3. Active MISO drain: Clock until the card releases MISO to 0xFF
+    Serial.println("[2] Waiting for SD card to release MISO...");
     SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
-    for (uint8_t i = 0; i < 32; i++) {
-        SPI.transfer(0xFF);
+    uint32_t drainStart = millis();
+    while (SPI.transfer(0xFF) != 0xFF) {
+        if (millis() - drainStart > 300) {
+            Serial.println("    Notice: MISO drain timed out, proceeding to mount.");
+            break;
+        }
     }
     SPI.endTransaction();
 
-    // 4. Mount SD card with retry logic for warm resets
+    // 4. Mount SD card with active recovery clocking on retry
     Serial.print("[3] Mounting SD card at 10 MHz... ");
     bool sdOk = false;
     for (uint8_t attempt = 1; attempt <= 3; attempt++) {
         sdOk = SD.begin(SD_CS, SPI, 10_MHz);
         if (sdOk) break;
+
         Serial.printf("retry %d... ", attempt);
-        delay(150);
+
+        // Clock the bus actively with CS high during retry backoff
+        SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
+        for (int i = 0; i < 32; i++) SPI.transfer(0xFF);
+        SPI.endTransaction();
+
+        delay(100);
     }
 
     if (sdOk) {
@@ -293,7 +299,7 @@ void setup() {
         Serial.println("FAILED!");
     }
 
-    // 5. Initialize camera
+    // 5. Initialize Camera
     Serial.print("[4] Initializing Camera... ");
     camera_config_t config = get_camera_config();
     esp_err_t       camErr = esp_camera_init(&config);
@@ -304,7 +310,7 @@ void setup() {
     Serial.println("OK");
     configure_camera();
 
-    // 6. Initialize display at 80 MHz
+    // 6. Initialize Display at 80 MHz
     Serial.print("[5] Initializing Display... ");
     display.init();
     display.setSwapBytes(false);
