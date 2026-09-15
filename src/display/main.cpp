@@ -91,7 +91,18 @@ LGFX_Sprite  canvas(&display);
 
 // camera
 
-static camera_config_t get_camera_config() {
+struct cam_mode_t {
+    framesize_t framesize;
+    pixformat_t pixformat;
+    size_t      fb_count;
+
+    bool operator==(const cam_mode_t&) const = default;
+};
+
+static cam_mode_t MODE_VIEWFINDER = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2};
+static cam_mode_t MODE_CAPTURE    = {FRAMESIZE_UXGA, PIXFORMAT_JPEG, 1};
+
+static camera_config_t build_camera_config(const cam_mode_t& mode) {
     camera_config_t config = {};
 
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -116,10 +127,11 @@ static camera_config_t get_camera_config() {
     config.pin_sccb_sda = CAMERA_SDA;
     config.pin_sccb_scl = CAMERA_SCL;
 
-    config.pixel_format = PIXFORMAT_RGB565;
-    config.frame_size   = FRAMESIZE_QVGA;
+    config.pixel_format = mode.pixformat;
+    config.frame_size   = mode.framesize;
+    config.fb_count     = mode.fb_count;
 
-    config.fb_count     = 2;
+    config.jpeg_quality = CAMERA_JPEG_QUALITY;
     config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAMERA_PCLK_FREQ;
 
@@ -172,6 +184,19 @@ static void configure_camera() {
     enable_sde_bits(s, 0x07);
 }
 
+bool camera_init(const cam_mode_t& mode = MODE_VIEWFINDER) {
+    esp_camera_deinit();
+
+    camera_config_t config = build_camera_config(mode);
+    if (esp_camera_init(&config) != ESP_OK) {
+        Serial.println("Error: Camera initialization failed");
+        return false;
+    }
+
+    configure_camera();
+    return true;
+}
+
 // SD card
 
 void findNextPhotoIndex() {
@@ -207,27 +232,41 @@ void unmountSD() {
     digitalWrite(SD_CS, HIGH);
 }
 
-bool testSdCard() {
+bool saveImage(const char* filename, const uint8_t* data, size_t size) {
     if (!mountSD()) {
         Serial.println("Error: Failed to mount SD card");
         return false;
     }
 
-    File file = SD.open("/test.txt", FILE_WRITE, true);
+    File file = SD.open(filename, FILE_WRITE, true);
     if (!file) {
         Serial.println("Error: Failed to open file");
         unmountSD();
         return false;
     }
 
-    size_t size = file.println("Some Test String Demo File");
+    size_t size_written = file.write(data, size);
     file.flush();
     file.close();
 
-    Serial.printf("Size written: %u\n", (unsigned)size);
+    return size_written == size;
+}
 
-    unmountSD();
-    return true;
+void capture() {
+    camera_init(MODE_CAPTURE);
+
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) {
+        Serial.println("Capture failed");
+        return;
+    }
+
+    bool saveOK = saveImage("/image.jpg", fb->buf, fb->len);
+    esp_camera_fb_return(fb);
+
+    if (!saveOK) {
+        Serial.println("Save failed");
+    }
 }
 
 void setup() {
@@ -255,12 +294,7 @@ void setup() {
         // TODO: reboot
     }
 
-    camera_config_t config = get_camera_config();
-    if (esp_camera_init(&config) != ESP_OK) {
-        Serial.println("Camera initialization failed.");
-        return;
-    }
-    configure_camera();
+    camera_init(MODE_VIEWFINDER);
 
     display.init();
     display.setSwapBytes(false);
@@ -302,6 +336,10 @@ void transitionTo(State next) {
 
     // entry action
     switch (state) {
+        case VIEWFINDER:
+            camera_init(MODE_VIEWFINDER);
+            break;
+
         case COUNTDOWN:
             countdown     = TICK_COUNT;
             countdown_tmr = millis() + TICK_TIME;
@@ -310,7 +348,7 @@ void transitionTo(State next) {
         case PICTURE:
             drawFrame();
             updateDisplay();
-            testSdCard();
+            capture();
             break;
 
         default:
