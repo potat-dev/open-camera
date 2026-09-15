@@ -252,6 +252,31 @@ bool saveImage(const char* filename, const uint8_t* data, size_t size) {
     return size_written == size;
 }
 
+struct photo_buffer {
+    uint8_t* data;
+    size_t   size;
+    size_t   capacity;
+};
+
+static size_t append_photo_chunk(void* arg, size_t index, const void* data, size_t size) {
+    photo_buffer* ctx = (photo_buffer*)arg;
+    if (index == 0) ctx->size = 0;
+
+    if (ctx->size + size > ctx->capacity) {
+        // TODO: improve realloc sizing (capacity * 2 can be dangerous)
+        size_t new_capacity = ctx->capacity ? ctx->capacity * 2 : 32768;
+        while (new_capacity < ctx->size + size) new_capacity *= 2;
+        uint8_t* new_data = (uint8_t*)heap_caps_realloc(ctx->data, new_capacity, MALLOC_CAP_SPIRAM);
+        if (!new_data) return 0;
+        ctx->data     = new_data;
+        ctx->capacity = new_capacity;
+    }
+
+    memcpy(ctx->data + ctx->size, data, size);
+    ctx->size += size;
+    return size;
+}
+
 void capture() {
     ESP_LOGI("capture", "Capture start");
 
@@ -275,17 +300,14 @@ void capture() {
 
     ESP_LOGI("capture", "RAW capture done");
 
-    uint8_t* data = NULL;
-    size_t   size = 0;
+    photo_buffer ctx = {NULL, 0, 0};
 
-    // TODO: rewrite to frame2jpg_cb
-    // because frame2jpg has 128kb buffer limit
-    ok = frame2jpg(raw_data, CAMERA_JPEG_QUALITY, &data, &size);
+    ok = frame2jpg_cb(raw_data, CAMERA_JPEG_QUALITY, append_photo_chunk, &ctx);
     esp_camera_fb_return(raw_data);
 
-    if (!ok || !data) {
+    if (!ok || !ctx.data) {
         Serial.println("JPEG compression failed");
-        if (data) free(data);
+        if (ctx.data) free(ctx.data);
         return;
     }
 
@@ -294,8 +316,8 @@ void capture() {
     char path[32];
     snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex++);
 
-    ok = saveImage(path, data, size);
-    free(data);
+    ok = saveImage(path, ctx.data, ctx.size);
+    free(ctx.data);
 
     if (!ok) {
         Serial.println("Save failed");
