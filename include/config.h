@@ -52,7 +52,8 @@ constexpr uint32_t TICK_TIME      = 1000;
 constexpr uint32_t TICK_COUNT_MAX = 250;
 
 // camera params
-constexpr uint8_t CAMERA_JPEG_QUALITY = 10;  // 0-63, lower means higher quality
+constexpr uint8_t CAMERA_JPEG_QUALITY = 85;
+// constexpr uint8_t CAMERA_JPEG_QUALITY = 10;  // 0-63, lower means higher quality
 
 // data transfer rate
 constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets

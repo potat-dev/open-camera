@@ -93,14 +93,14 @@ LGFX_Sprite  canvas(&display);
 
 struct cam_mode_t {
     framesize_t framesize;
-    pixformat_t pixformat;
+    pixformat_t pixformat;  // RGB565 or YUV422, never JPEG
     size_t      fb_count;
 
     bool operator==(const cam_mode_t&) const = default;
 };
 
 static cam_mode_t MODE_VIEWFINDER = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2};
-static cam_mode_t MODE_CAPTURE    = {FRAMESIZE_UXGA, PIXFORMAT_JPEG, 1};
+static cam_mode_t MODE_CAPTURE    = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1};
 
 static camera_config_t build_camera_config(const cam_mode_t& mode) {
     camera_config_t config = {};
@@ -131,7 +131,6 @@ static camera_config_t build_camera_config(const cam_mode_t& mode) {
     config.frame_size   = mode.framesize;
     config.fb_count     = mode.fb_count;
 
-    config.jpeg_quality = CAMERA_JPEG_QUALITY;
     config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAMERA_PCLK_FREQ;
 
@@ -253,20 +252,37 @@ bool saveImage(const char* filename, const uint8_t* data, size_t size) {
 }
 
 void capture() {
+    ESP_LOGI("capture", "Capture start");
+
     camera_init(MODE_CAPTURE);
 
-    camera_fb_t* fb = esp_camera_fb_get();
-    if (!fb) {
+    camera_fb_t* raw_data = esp_camera_fb_get();
+    if (!raw_data) {
         Serial.println("Capture failed");
         return;
     }
 
-    bool saveOK = saveImage("/image.jpg", fb->buf, fb->len);
-    esp_camera_fb_return(fb);
+    ESP_LOGI("capture", "RAW capture done");
 
+    uint8_t* data = NULL;
+    size_t   size = 0;
+
+    bool converted = frame2jpg(raw_data, CAMERA_JPEG_QUALITY, &data, &size);
+    esp_camera_fb_return(raw_data);
+
+    if (!converted) {
+        Serial.println("JPEG compression failed");
+        return;
+    }
+
+    ESP_LOGI("capture", "JPEG compression done");
+
+    bool saveOK = saveImage("/image.jpg", data, size);
     if (!saveOK) {
         Serial.println("Save failed");
     }
+
+    ESP_LOGI("capture", "Save done");
 }
 
 void setup() {
