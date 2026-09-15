@@ -186,33 +186,56 @@ void findNextPhotoIndex() {
     Serial.printf("Next photo will be: /pic_%04d.jpg\n", nextPhotoIndex);
 }
 
+// Sends a raw command in SPI mode and returns the R1 response
+static uint8_t sendRawCmd(uint8_t cmd, uint32_t arg, uint8_t crc) {
+    SPI.transfer(0x40 | cmd);
+    SPI.transfer((arg >> 24) & 0xFF);
+    SPI.transfer((arg >> 16) & 0xFF);
+    SPI.transfer((arg >> 8) & 0xFF);
+    SPI.transfer(arg & 0xFF);
+    SPI.transfer(crc);
+
+    uint8_t res = 0xFF;
+    for (int i = 0; i < 16; i++) {
+        res = SPI.transfer(0xFF);
+        if ((res & 0x80) == 0) break;
+    }
+    return res;
+}
+
 bool testSdCard() {
-    // 1. Conclude active display DMA operations
+    // 1. Conclude display operations
     display.waitDMA();
     digitalWrite(DISPLAY_CS, HIGH);
 
-    // 2. Bus settling delay
+    // 2. Bus settling delay after display DMA
     delay(5);
 
-    // 3. Re-assert Arduino SPI bus configuration over SPI2_HOST.
-    // This cleans up register states left by LovyanGFX's 80 MHz DMA.
-    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
+    // 3. Re-align SPI2_HOST to Mode 0 at 10 MHz
+    SPI.beginTransaction(SPISettings(10_MHz, MSBFIRST, SPI_MODE0));
+    SPI.transfer(0xFF);
 
-    // 4. Ensure MISO is released by clocking until line is 0xFF
+    // 4. Wake the card from idle power-save into active transfer state.
+    // This prevents CMD13 in ff_sd_status() from returning 0x01 (Idle),
+    // eliminating the "Check status failed" error entirely.
+    digitalWrite(SD_CS, LOW);
+    sendRawCmd(55, 0, 0x65);                       // CMD55: APP_CMD prefix
+    uint8_t r = sendRawCmd(41, 0x40000000, 0x77);  // ACMD41: HCS=1
     digitalWrite(SD_CS, HIGH);
-    uint32_t t0 = millis();
-    while (SPI.transfer(0xFF) != 0xFF) {
-        if (millis() - t0 > 200) break;
-    }
+    SPI.transfer(0xFF);  // 8 clocks to release MISO
+    SPI.endTransaction();
 
-    // 5. Open and write file
+    // 5. Perform file I/O
     File file = SD.open("/test.txt", FILE_WRITE, true);
 
-    // Recovery path in the event of an unexpected bus stall
+    // Recovery path in case of an unexpected bus stall
     if (!file) {
+        Serial.println("Warning: File open failed, executing clean re-mount...");
         digitalWrite(SD_CS, HIGH);
+
         SD.end();
         delay(20);
+
         SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
         if (SD.begin(SD_CS, SPI, 10_MHz)) {
             file = SD.open("/test.txt", FILE_WRITE, true);
@@ -238,7 +261,7 @@ bool testSdCard() {
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);
+    delay(1500);
 
     Serial.setDebugOutput(true);
 
@@ -246,7 +269,7 @@ void setup() {
     Serial.println("         STEP-BY-STEP SPI DEBUG         ");
     Serial.println("========================================");
 
-    // 1. De-assert chip select lines
+    // 1. Immediately de-assert chip select lines
     pinMode(DISPLAY_CS, OUTPUT);
     digitalWrite(DISPLAY_CS, HIGH);
 
@@ -256,24 +279,38 @@ void setup() {
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    // 2. Initialize SPI bus
+    // 2. Initialize SPI bus with software CS (-1)
     Serial.print("[1] Initializing Arduino SPI bus... ");
     bool spiOk = SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, -1);
     Serial.println(spiOk ? "OK" : "FAILED");
 
-    // 3. Active MISO drain: Clock until the card releases MISO to 0xFF
-    Serial.println("[2] Waiting for SD card to release MISO...");
+    // 3. Hardware warm-boot recovery sequence:
+    // Forces the SD card controller out of any interrupted data state left by esptool or warm
+    // reset.
+    Serial.println("[2] Executing warm-reset bus recovery...");
     SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
-    uint32_t drainStart = millis();
-    while (SPI.transfer(0xFF) != 0xFF) {
-        if (millis() - drainStart > 300) {
-            Serial.println("    Notice: MISO drain timed out, proceeding to mount.");
-            break;
-        }
-    }
+
+    // A. Issue CMD12 (STOP_TRANSMISSION) with CS LOW to abort any dangling transfer
+    digitalWrite(SD_CS, LOW);
+    sendRawCmd(12, 0, 0x61);
+    for (int i = 0; i < 16; i++) SPI.transfer(0xFF);
+
+    // B. De-assert CS and send 80 clocks (10 bytes) at 400 kHz
+    digitalWrite(SD_CS, HIGH);
+    for (int i = 0; i < 16; i++) SPI.transfer(0xFF);
+
+    // C. Wait for card to release MISO (clear busy)
+    digitalWrite(SD_CS, LOW);
+    uint32_t t0 = millis();
+    while (SPI.transfer(0xFF) != 0xFF && (millis() - t0 < 300));
+    digitalWrite(SD_CS, HIGH);
+
+    // D. Mandatory 80 dummy clock cycles with CS HIGH per SD Specification
+    for (int i = 0; i < 16; i++) SPI.transfer(0xFF);
+
     SPI.endTransaction();
 
-    // 4. Mount SD card with active recovery clocking on retry
+    // 4. Mount SD card at 10 MHz with retry logic
     Serial.print("[3] Mounting SD card at 10 MHz... ");
     bool sdOk = false;
     for (uint8_t attempt = 1; attempt <= 3; attempt++) {
@@ -281,12 +318,6 @@ void setup() {
         if (sdOk) break;
 
         Serial.printf("retry %d... ", attempt);
-
-        // Clock the bus actively with CS high during retry backoff
-        SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
-        for (int i = 0; i < 32; i++) SPI.transfer(0xFF);
-        SPI.endTransaction();
-
         delay(100);
     }
 
