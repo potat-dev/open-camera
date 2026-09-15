@@ -256,7 +256,7 @@ void capture() {
 
     camera_init(MODE_CAPTURE);
 
-    camera_fb_t* raw_data = esp_camera_fb_get();
+    camera_fb_t* raw_data = esp_camera_fb_get();  // TODO: fix green tint (drop first frame)
     if (!raw_data) {
         Serial.println("Capture failed");
         return;
@@ -277,9 +277,13 @@ void capture() {
 
     ESP_LOGI("capture", "JPEG compression done");
 
-    bool saveOK = saveImage("/image.jpg", data, size);
+    char path[32];
+    snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex++);
+
+    bool saveOK = saveImage(path, data, size);
     if (!saveOK) {
         Serial.println("Save failed");
+        return;
     }
 
     ESP_LOGI("capture", "Save done");
