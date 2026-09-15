@@ -278,19 +278,30 @@ static size_t append_photo_chunk(void* arg, size_t index, const void* data, size
 }
 
 void capture() {
+    bool         ok;
+    char         path[32];
+    camera_fb_t* raw_data;
+    photo_buffer ctx = {NULL, 0, 0};
+
     ESP_LOGI("capture", "Capture start");
 
     // TODO: also capture and save viewfinder frame with some .raw ext
-    bool ok = camera_init(MODE_CAPTURE);
+    ok = camera_init(MODE_CAPTURE);
     if (!ok) {
         Serial.println("Camera init failed");
         return;
     }
 
-    // drop 1 dummy frame
+    // drop 2 dummy frames
     // TODO: probably need more (needs testing)
-    camera_fb_t* raw_data = esp_camera_fb_get();
+    // seems like it does not help
+    delay(5);
+    raw_data = esp_camera_fb_get();
     if (raw_data) esp_camera_fb_return(raw_data);
+    delay(5);
+    raw_data = esp_camera_fb_get();
+    if (raw_data) esp_camera_fb_return(raw_data);
+    delay(5);
 
     raw_data = esp_camera_fb_get();
     if (!raw_data) {
@@ -299,8 +310,6 @@ void capture() {
     }
 
     ESP_LOGI("capture", "RAW capture done");
-
-    photo_buffer ctx = {NULL, 0, 0};
 
     ok = frame2jpg_cb(raw_data, CAMERA_JPEG_QUALITY, append_photo_chunk, &ctx);
     esp_camera_fb_return(raw_data);
@@ -313,9 +322,7 @@ void capture() {
 
     ESP_LOGI("capture", "JPEG compression done");
 
-    char path[32];
     snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex++);
-
     ok = saveImage(path, ctx.data, ctx.size);
     free(ctx.data);
 
