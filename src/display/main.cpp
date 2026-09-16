@@ -231,7 +231,7 @@ void unmountSD() {
     digitalWrite(SD_CS, HIGH);
 }
 
-bool saveImage(const char* filename, const uint8_t* data, size_t size) {
+bool saveData(const char* filename, const uint8_t* data, size_t size) {
     if (!mountSD()) {
         Serial.println("Error: Failed to mount SD card");
         return false;
@@ -244,94 +244,97 @@ bool saveImage(const char* filename, const uint8_t* data, size_t size) {
         return false;
     }
 
-    size_t size_written = file.write(data, size);
+    size_t written = file.write(data, size);
     file.flush();
     file.close();
 
     unmountSD();
-    return size_written == size;
+    return written == size;
 }
 
-struct photo_buffer {
-    uint8_t* data;
-    size_t   size;
-    size_t   capacity;
-};
-
-static size_t append_photo_chunk(void* arg, size_t index, const void* data, size_t size) {
-    photo_buffer* ctx = (photo_buffer*)arg;
-    if (index == 0) ctx->size = 0;
-
-    if (ctx->size + size > ctx->capacity) {
-        // TODO: improve realloc sizing (capacity * 2 can be dangerous)
-        size_t new_capacity = ctx->capacity ? ctx->capacity * 2 : 32768;
-        while (new_capacity < ctx->size + size) new_capacity *= 2;
-        uint8_t* new_data = (uint8_t*)heap_caps_realloc(ctx->data, new_capacity, MALLOC_CAP_SPIRAM);
-        if (!new_data) return 0;
-        ctx->data     = new_data;
-        ctx->capacity = new_capacity;
-    }
-
-    memcpy(ctx->data + ctx->size, data, size);
-    ctx->size += size;
-    return size;
+static size_t save_photo_chunk(void* arg, size_t index, const void* data, size_t size) {
+    File* file = static_cast<File*>(arg);
+    return file->write(static_cast<const uint8_t*>(data), size);
 }
 
 void capture() {
-    bool         ok;
-    char         path[32];
+    bool ok;
+    char path[32];
+
+    ESP_LOGI("capture", "Capture entered, waiting for DMA");
+
+    display.waitDMA();
+
+    ESP_LOGI("capture", "Resize and dummy capture start");
+
+    sensor_t* s = esp_camera_sensor_get();
+    if (!s) return;
+
+    // preserve gains
+    s->set_whitebal(s, 0);
+    s->set_exposure_ctrl(s, 0);
+    s->set_framesize(s, SIZE_CAPTURE);
+
     camera_fb_t* raw_data;
-    photo_buffer ctx = {NULL, 0, 0};
-
-    ESP_LOGI("capture", "Capture start");
-
-    // TODO: also capture and save viewfinder frame with some .raw ext
-    ok = camera_init(MODE_CAPTURE);
-    if (!ok) {
-        Serial.println("Camera init failed");
-        return;
-    }
 
     // drop 2 dummy frames
     // TODO: probably need more (needs testing)
-    // seems like it does not help
-    delay(5);
     raw_data = esp_camera_fb_get();
     if (raw_data) esp_camera_fb_return(raw_data);
-    delay(5);
     raw_data = esp_camera_fb_get();
     if (raw_data) esp_camera_fb_return(raw_data);
-    delay(5);
+
+    ESP_LOGI("capture", "RAW capture start");
 
     raw_data = esp_camera_fb_get();
     if (!raw_data) {
         Serial.println("Capture failed");
+
+        s->set_framesize(s, SIZE_VIEWFINDER);
+        s->set_whitebal(s, whiteBalance.value);
+        s->set_exposure_ctrl(s, expCtrl.value);
+
         return;
     }
 
-    ESP_LOGI("capture", "RAW capture done");
+    ESP_LOGI("capture", "RAW capture done, opening file");
 
-    ok = frame2jpg_cb(raw_data, CAMERA_JPEG_QUALITY, append_photo_chunk, &ctx);
-    esp_camera_fb_return(raw_data);
-
-    if (!ok || !ctx.data) {
-        Serial.println("JPEG compression failed");
-        if (ctx.data) free(ctx.data);
+    ok = mountSD();
+    if (!ok) {
+        Serial.println("Error: Failed to mount SD card");
+        esp_camera_fb_return(raw_data);
         return;
     }
-
-    ESP_LOGI("capture", "JPEG compression done");
 
     snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex++);
-    ok = saveImage(path, ctx.data, ctx.size);
-    free(ctx.data);
 
-    if (!ok) {
-        Serial.println("Save failed");
+    File file = SD.open(path, FILE_WRITE, true);
+    if (!file) {
+        Serial.println("Error: Failed to open file");
+        esp_camera_fb_return(raw_data);
+        unmountSD();
         return;
     }
 
-    ESP_LOGI("capture", "Save done");
+    ESP_LOGI("capture", "File open, converting");
+
+    ok = frame2jpg_cb(raw_data, IMAGE_QUALITY, save_photo_chunk, &file);
+    esp_camera_fb_return(raw_data);
+
+    file.flush();
+    file.close();
+    unmountSD();
+
+    s->set_framesize(s, SIZE_VIEWFINDER);
+    s->set_whitebal(s, whiteBalance.value);
+    s->set_exposure_ctrl(s, expCtrl.value);
+
+    if (!ok) {
+        Serial.println("JPEG compression and save failed");
+        return;
+    }
+
+    ESP_LOGI("capture", "JPEG compression and save done");
 }
 
 void setup() {
@@ -350,16 +353,21 @@ void setup() {
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
 
-    if (mountSD()) {
-        Serial.printf("SD Card detected. Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
-        findNextPhotoIndex();
-        unmountSD();
-    } else {
+    bool sd_ok = mountSD();
+    if (!sd_ok) {
         Serial.println("Error: Failed to mount SD card");
-        // TODO: reboot
+        // TODO: conditional reboot
     }
 
-    camera_init(MODE_VIEWFINDER);
+    Serial.printf("SD Card detected. Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
+    findNextPhotoIndex();
+    unmountSD();
+
+    bool cam_ok = camera_init(MODE_VIEWFINDER);
+    if (!cam_ok) {
+        Serial.println("Fatal: Camera initialization failed");
+        return;
+    }
 
     display.init();
     display.setSwapBytes(false);
