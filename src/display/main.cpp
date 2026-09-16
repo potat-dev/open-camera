@@ -184,22 +184,37 @@ static void configure_camera() {
 }
 
 struct SensorGains {
-    uint8_t gain;
-    uint8_t blue;
-    uint8_t red;
-    uint8_t aec;
+    // bank 1: gain and exposure
+    uint8_t agc_gain;
+    uint8_t aec_low;
+    uint8_t aec_mid;
+    uint8_t aec_high;
+
+    // bank 0: color balance multipliers
+    uint8_t red_gain;
+    uint8_t green_gain;
+    uint8_t blue_gain;
 };
 
 static SensorGains read_sensor_gains() {
     SensorGains g = {};
-    sensor_t*   s = esp_camera_sensor_get();
+
+    sensor_t* s = esp_camera_sensor_get();
     if (!s) return g;
 
-    s->set_reg(s, 0xFF, 0xFF, 0x01);  // Bank 1
-    g.gain = s->get_reg(s, 0x00, 0xFF);
-    g.blue = s->get_reg(s, 0x01, 0xFF);
-    g.red  = s->get_reg(s, 0x02, 0xFF);
-    g.aec  = s->get_reg(s, 0x10, 0xFF);
+    // analog gain and exposure (bank 1)
+    s->set_reg(s, 0xFF, 0xFF, 0x01);
+    g.agc_gain = s->get_reg(s, 0x00, 0xFF);  // REG00: AGC gain
+    g.aec_low  = s->get_reg(s, 0x04, 0x03);  // COM1: AEC bits [1:0]
+    g.aec_mid  = s->get_reg(s, 0x10, 0xFF);  // AEC:  AEC bits [9:2]
+    g.aec_high = s->get_reg(s, 0x45, 0x3F);  // REG45: AEC bits [15:10]
+
+    // awb color multipliers (bank 0)
+    s->set_reg(s, 0xFF, 0xFF, 0x00);
+    g.red_gain   = s->get_reg(s, 0xCC, 0xFF);  // R
+    g.green_gain = s->get_reg(s, 0xCD, 0xFF);  // G
+    g.blue_gain  = s->get_reg(s, 0xCE, 0xFF);  // B
+
     return g;
 }
 
@@ -207,15 +222,27 @@ static void apply_sensor_gains(const SensorGains& g) {
     sensor_t* s = esp_camera_sensor_get();
     if (!s) return;
 
-    s->set_whitebal(s, 0);       // Freeze AWB
-    s->set_exposure_ctrl(s, 0);  // Freeze AEC
-    s->set_gain_ctrl(s, 0);      // Freeze AGC
+    s->set_exposure_ctrl(s, 0);  // disable AEC loop
+    s->set_gain_ctrl(s, 0);      // disable AGC loop
 
-    s->set_reg(s, 0xFF, 0xFF, 0x01);  // Bank 1
-    s->set_reg(s, 0x00, 0xFF, g.gain);
-    s->set_reg(s, 0x01, 0xFF, g.blue);
-    s->set_reg(s, 0x02, 0xFF, g.red);
-    s->set_reg(s, 0x10, 0xFF, g.aec);
+    // restore exposure and analog gain (bank 1)
+    s->set_reg(s, 0xFF, 0xFF, 0x01);
+    s->set_reg(s, 0x00, 0xFF, g.agc_gain);
+    s->set_reg(s, 0x04, 0x03, g.aec_low);
+    s->set_reg(s, 0x10, 0xFF, g.aec_mid);
+    s->set_reg(s, 0x45, 0x3F, g.aec_high);
+
+    s->set_whitebal(s, 0);  // disable AWB loop
+
+    // restore color balance multipliers (bank 0)
+    s->set_reg(s, 0xFF, 0xFF, 0x00);
+    uint8_t c7 = s->get_reg(s, 0xC7, 0xFF);  // enable manual color multiplier mode
+    s->set_reg(s, 0xC7, 0xFF, c7 | 0x40);
+
+    // restore RGB multipliers from viewfinder
+    s->set_reg(s, 0xCC, 0xFF, g.red_gain);
+    s->set_reg(s, 0xCD, 0xFF, g.green_gain);
+    s->set_reg(s, 0xCE, 0xFF, g.blue_gain);
 }
 
 bool camera_init(const cam_mode_t& mode = MODE_VIEWFINDER) {
@@ -305,15 +332,15 @@ void capture() {
     SensorGains gains = read_sensor_gains();
 
     // reinit for correct frame and buffer size
-    if (!camera_init(MODE_CAPTURE)) {
+    ok = camera_init(MODE_CAPTURE);
+    if (!ok) {
         Serial.println("Error: Failed to init camera for capture");
-        camera_init(MODE_VIEWFINDER);
         return;
     }
 
     apply_sensor_gains(gains);
 
-    // discard first frame
+    // discard dummy frame
     camera_fb_t* dummy = esp_camera_fb_get();
     if (dummy) esp_camera_fb_return(dummy);
 
