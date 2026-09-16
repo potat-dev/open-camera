@@ -183,6 +183,41 @@ static void configure_camera() {
     enable_sde_bits(s, 0x07);
 }
 
+struct SensorGains {
+    uint8_t gain;
+    uint8_t blue;
+    uint8_t red;
+    uint8_t aec;
+};
+
+static SensorGains read_sensor_gains() {
+    SensorGains g = {};
+    sensor_t*   s = esp_camera_sensor_get();
+    if (!s) return g;
+
+    s->set_reg(s, 0xFF, 0xFF, 0x01);  // Bank 1
+    g.gain = s->get_reg(s, 0x00, 0xFF);
+    g.blue = s->get_reg(s, 0x01, 0xFF);
+    g.red  = s->get_reg(s, 0x02, 0xFF);
+    g.aec  = s->get_reg(s, 0x10, 0xFF);
+    return g;
+}
+
+static void apply_sensor_gains(const SensorGains& g) {
+    sensor_t* s = esp_camera_sensor_get();
+    if (!s) return;
+
+    s->set_whitebal(s, 0);       // Freeze AWB
+    s->set_exposure_ctrl(s, 0);  // Freeze AEC
+    s->set_gain_ctrl(s, 0);      // Freeze AGC
+
+    s->set_reg(s, 0xFF, 0xFF, 0x01);  // Bank 1
+    s->set_reg(s, 0x00, 0xFF, g.gain);
+    s->set_reg(s, 0x01, 0xFF, g.blue);
+    s->set_reg(s, 0x02, 0xFF, g.red);
+    s->set_reg(s, 0x10, 0xFF, g.aec);
+}
+
 bool camera_init(const cam_mode_t& mode = MODE_VIEWFINDER) {
     esp_camera_deinit();
 
@@ -265,39 +300,33 @@ void capture() {
 
     display.waitDMA();
 
-    ESP_LOGI("capture", "Resize and dummy capture start");
+    ESP_LOGI("capture", "Preserving gains and reading dummy frame");
 
-    sensor_t* s = esp_camera_sensor_get();
-    if (!s) return;
+    SensorGains gains = read_sensor_gains();
 
-    // preserve gains
-    s->set_whitebal(s, 0);
-    s->set_exposure_ctrl(s, 0);
-    s->set_framesize(s, SIZE_CAPTURE);
-
-    camera_fb_t* raw_data;
-
-    // drop 2 dummy frames
-    // TODO: probably need more (needs testing)
-    raw_data = esp_camera_fb_get();
-    if (raw_data) esp_camera_fb_return(raw_data);
-    raw_data = esp_camera_fb_get();
-    if (raw_data) esp_camera_fb_return(raw_data);
-
-    ESP_LOGI("capture", "RAW capture start");
-
-    raw_data = esp_camera_fb_get();
-    if (!raw_data) {
-        Serial.println("Capture failed");
-
-        s->set_framesize(s, SIZE_VIEWFINDER);
-        s->set_whitebal(s, whiteBalance.value);
-        s->set_exposure_ctrl(s, expCtrl.value);
-
+    // reinit for correct frame and buffer size
+    if (!camera_init(MODE_CAPTURE)) {
+        Serial.println("Error: Failed to init camera for capture");
+        camera_init(MODE_VIEWFINDER);
         return;
     }
 
-    ESP_LOGI("capture", "RAW capture done, opening file");
+    apply_sensor_gains(gains);
+
+    // discard first frame
+    camera_fb_t* dummy = esp_camera_fb_get();
+    if (dummy) esp_camera_fb_return(dummy);
+
+    ESP_LOGI("capture", "Capturing actual frame");
+
+    // capture actual frame
+    camera_fb_t* raw_data = esp_camera_fb_get();
+    if (!raw_data) {
+        Serial.println("Capture failed");
+        return;
+    }
+
+    ESP_LOGI("capture", "Capture done, opening file");
 
     ok = mountSD();
     if (!ok) {
@@ -316,18 +345,15 @@ void capture() {
         return;
     }
 
-    ESP_LOGI("capture", "File open, converting");
+    ESP_LOGI("capture", "File open, converting and saving");
 
+    // compress and stream to SD card
     ok = frame2jpg_cb(raw_data, IMAGE_QUALITY, save_photo_chunk, &file);
     esp_camera_fb_return(raw_data);
 
     file.flush();
     file.close();
     unmountSD();
-
-    s->set_framesize(s, SIZE_VIEWFINDER);
-    s->set_whitebal(s, whiteBalance.value);
-    s->set_exposure_ctrl(s, expCtrl.value);
 
     if (!ok) {
         Serial.println("JPEG compression and save failed");
