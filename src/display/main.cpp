@@ -7,7 +7,7 @@
 #include <camera.h>
 #include <esp_timer.h>
 #include <fb_gfx.h>
-#include <img_converters.h>
+#include "img_converters.h"
 
 #include "config.h"
 #include "menu_config.h"
@@ -146,7 +146,7 @@ static void enable_sde_bits(sensor_t* s, uint8_t bits) {
 
 static void configure_camera() {
     // set sensor configs
-    sensor_t* s = esp_camera_sensor_get();
+    sensor_t* s = cam_sensor_get();
 
     // switches
     s->set_exposure_ctrl(s, expCtrl.value);
@@ -191,7 +191,7 @@ struct WhiteBalance {
 };
 
 WhiteBalance get_white_balance() {
-    sensor_t* s = esp_camera_sensor_get();
+    sensor_t* s = cam_sensor_get();
 
     // switch to bank 1 (sensor) to read scene averages
     s->set_reg(s, 0xFF, 0xFF, 0x01);
@@ -219,7 +219,7 @@ WhiteBalance get_white_balance() {
 }
 
 void apply_white_balance(const WhiteBalance& wb) {
-    sensor_t* s = esp_camera_sensor_get();
+    sensor_t* s = cam_sensor_get();
 
     // switch to bank 0 (DSP)
     s->set_reg(s, 0xFF, 0xFF, 0x00);
@@ -234,10 +234,10 @@ void apply_white_balance(const WhiteBalance& wb) {
 }
 
 bool camera_init(const cam_mode_t& mode = MODE_VIEWFINDER) {
-    esp_camera_deinit();
+    cam_deinit();
 
     camera_config_t config = build_camera_config(mode);
-    if (esp_camera_init(&config) != ESP_OK) {
+    if (cam_init(&config) != ESP_OK) {
         Serial.println("Error: Camera initialization failed");
         return false;
     }
@@ -331,13 +331,13 @@ void capture() {
     ESP_LOGI("capture", "Reading dummy frame");
 
     // discard dummy frame
-    camera_fb_t* dummy = esp_camera_fb_get();
-    if (dummy) esp_camera_fb_return(dummy);
+    camera_fb_t* dummy = cam_fb_get();
+    if (dummy) cam_fb_return(dummy);
 
     ESP_LOGI("capture", "Capturing actual frame");
 
     // capture actual frame
-    camera_fb_t* raw_data = esp_camera_fb_get();
+    camera_fb_t* raw_data = cam_fb_get();
     if (!raw_data) {
         Serial.println("Capture failed");
         return;
@@ -348,7 +348,7 @@ void capture() {
     ok = mountSD();
     if (!ok) {
         Serial.println("Error: Failed to mount SD card");
-        esp_camera_fb_return(raw_data);
+        cam_fb_return(raw_data);
         return;
     }
 
@@ -357,7 +357,7 @@ void capture() {
     File file = SD.open(path, FILE_WRITE, true);
     if (!file) {
         Serial.println("Error: Failed to open file");
-        esp_camera_fb_return(raw_data);
+        cam_fb_return(raw_data);
         unmountSD();
         return;
     }
@@ -366,7 +366,7 @@ void capture() {
 
     // compress and stream to SD card
     ok = frame2jpg_cb(raw_data, IMAGE_QUALITY, save_photo_chunk, &file);
-    esp_camera_fb_return(raw_data);
+    cam_fb_return(raw_data);
 
     file.flush();
     file.close();
@@ -421,14 +421,14 @@ void setup() {
 }
 
 void drawFrame() {
-    camera_fb_t* fb = esp_camera_fb_get();
+    camera_fb_t* fb = cam_fb_get();
     if (!fb) {
         Serial.println("Capture failed");
         return;
     }
 
     canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
-    esp_camera_fb_return(fb);
+    cam_fb_return(fb);
 }
 
 void updateDisplay() { canvas.pushSprite(0, 0); }
