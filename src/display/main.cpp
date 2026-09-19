@@ -4,7 +4,7 @@
 #include <LovyanGFX.h>
 #include <SD.h>
 #include <SPI.h>
-#include <esp_camera.h>
+#include <camera.h>
 #include <esp_timer.h>
 #include <fb_gfx.h>
 #include <img_converters.h>
