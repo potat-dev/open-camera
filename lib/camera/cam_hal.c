@@ -567,7 +567,7 @@ esp_err_t cam_reconfigure_raw(framesize_t new_size)
     return ESP_OK;
 }
 
-esp_err_t cam_init(const camera_config_t *config)
+esp_err_t cam_hal_init(const camera_config_t *config)
 {
     CAM_CHECK(NULL != config, "config pointer is invalid", ESP_ERR_INVALID_ARG);
 
@@ -670,11 +670,11 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     return ESP_OK;
 
 err:
-    cam_deinit();
+    cam_hal_deinit();
     return ESP_FAIL;
 }
 
-esp_err_t cam_deinit(void)
+esp_err_t cam_hal_deinit(void)
 {
     if (!cam_obj) {
         return ESP_FAIL;
@@ -848,14 +848,14 @@ bool cam_get_available_frames(void)
     return 0 < uxQueueMessagesWaiting(cam_obj->frame_buffer_queue);
 }
 
-void cam_set_psram_mode(bool enable)
+void cam_hal_set_psram_mode(bool enable)
 {
     portENTER_CRITICAL(&g_psram_dma_lock);
     g_psram_dma_mode = enable;
     portEXIT_CRITICAL(&g_psram_dma_lock);
 }
 
-bool cam_get_psram_mode(void)
+bool cam_hal_get_psram_mode(void)
 {
     return g_psram_dma_mode;
 }

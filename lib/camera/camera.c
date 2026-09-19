@@ -16,7 +16,6 @@
 #include "sccb.h"
 #include "camera.h"
 #include "cam_hal.h"
-#include "xclk.h"
 #include "ov2640.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
@@ -191,7 +190,7 @@ esp_err_t cam_init(const camera_config_t *config)
 {
     esp_err_t err;
     s_saved_config = *config;
-    err = cam_init(config);
+    err = cam_hal_init(config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Camera init failed with error 0x%x", err);
         return err;
@@ -263,7 +262,7 @@ fail:
 
 esp_err_t cam_deinit()
 {
-    esp_err_t ret = cam_deinit();
+    esp_err_t ret = cam_hal_deinit();
     CAMERA_DISABLE_OUT_CLOCK();
     if (s_state) {
         SCCB_Deinit();
@@ -385,7 +384,7 @@ esp_err_t cam_set_color_gains(uint8_t red, uint8_t green, uint8_t blue)
 
 esp_err_t cam_set_psram_mode(bool enable)
 {
-    cam_set_psram_mode(enable);
+    cam_hal_set_psram_mode(enable);
     if (!s_state) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -394,5 +393,5 @@ esp_err_t cam_set_psram_mode(bool enable)
 
 bool cam_get_psram_mode(void)
 {
-    return cam_get_psram_mode();
+    return cam_hal_get_psram_mode();
 }

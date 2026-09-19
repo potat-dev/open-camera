@@ -38,7 +38,7 @@ const resolution_info_t resolution[FRAMESIZE_INVALID] = {
     // { 2592, 1944, ASPECT_RATIO_4X3   }, /* 5MP */
 };
 
-camera_sensor_info_t *esp_camera_sensor_get_info(sensor_id_t *id)
+camera_sensor_info_t *cam_sensor_get_info(sensor_id_t *id)
 {
     for (int i = 0; i < CAMERA_MODEL_MAX; i++) {
         if (id->PID == camera_sensor[i].pid) {

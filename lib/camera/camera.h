@@ -290,5 +290,3 @@ bool cam_get_psram_mode(void);
 #ifdef __cplusplus
 }
 #endif
-
-#include "img_converters.h" // TODO: calls .pio/libdeps/display/esp32-camera/conversions/include/img_converters.h

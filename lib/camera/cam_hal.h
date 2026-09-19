@@ -21,7 +21,7 @@ extern "C" {
  *     - ESP_OK Success
  *     - ESP_FAIL Uninitialize fail
  */
-esp_err_t cam_deinit(void);
+esp_err_t cam_hal_deinit(void);
 
 /**
  * @brief Initialize the lcd_cam module
@@ -34,7 +34,7 @@ esp_err_t cam_deinit(void);
  *     - ESP_ERR_NO_MEM No memory to initialize lcd_cam
  *     - ESP_FAIL Initialize fail
  */
-esp_err_t cam_init(const camera_config_t *config);
+esp_err_t cam_hal_init(const camera_config_t *config);
 
 esp_err_t cam_reconfigure_raw(framesize_t new_size);
 
@@ -52,8 +52,8 @@ void cam_give_all(void);
 
 bool cam_get_available_frames(void);
 
-void cam_set_psram_mode(bool enable);
-bool cam_get_psram_mode(void);
+void cam_hal_set_psram_mode(bool enable);
+bool cam_hal_get_psram_mode(void);
 
 #ifdef __cplusplus
 }

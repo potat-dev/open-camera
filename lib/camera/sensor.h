@@ -259,7 +259,7 @@ typedef struct _sensor {
     int  (*set_xclk)            (sensor_t *sensor, int timer, int xclk);
 } sensor_t;
 
-camera_sensor_info_t *esp_camera_sensor_get_info(sensor_id_t *id);
+camera_sensor_info_t *cam_sensor_get_info(sensor_id_t *id);
 
 #ifdef __cplusplus
 }

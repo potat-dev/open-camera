@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sccb.h"
-#include "xclk.h" // TODO: calls to .pio/libdeps/display/esp32-camera/driver/private_include/xclk.h
 #include "ov2640.h"
 #include "ov2640_regs.h"
 #include "ov2640_settings.h"
@@ -497,10 +496,9 @@ static int _set_pll(sensor_t *sensor, int bypass, int multiplier, int sys_div, i
 
 static int set_xclk(sensor_t *sensor, int timer, int xclk)
 {
-    int ret = 0;
-    sensor->xclk_freq_hz = xclk * 1000000U;
-    ret = xclk_timer_conf(timer, sensor->xclk_freq_hz);
-    return ret;
+    (void)timer;
+    (void)xclk;
+    return 0; // Sensor has its own oscillator
 }
 
 static int init_status(sensor_t *sensor){
