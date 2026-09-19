@@ -3,6 +3,7 @@
 #include <driver/spi_master.h>
 
 #include "common.h"
+#include "sensor.h"
 
 constexpr int16_t NOT_CONNECTED = -1;
 
@@ -48,8 +49,8 @@ constexpr uint16_t DISPLAY_HEIGHT = 240;
 
 // countdown params
 constexpr uint16_t TICK_COUNT     = 3;
-constexpr uint32_t TICK_TIME      = 1000;
-constexpr uint32_t TICK_COUNT_MAX = 250;
+constexpr uint16_t TICK_TIME      = 1000;
+constexpr uint16_t TICK_COUNT_MAX = 250;
 
 // camera params
 constexpr pixformat_t CAMERA_PIXFORMAT = PIXFORMAT_RGB565;  // RGB565 or YUV422, never JPEG
