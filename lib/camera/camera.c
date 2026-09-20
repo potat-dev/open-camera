@@ -31,8 +31,6 @@ typedef struct {
     camera_fb_t fb;
 } camera_state_t;
 
-static const char *CAMERA_SENSOR_NVS_KEY = "sensor";
-static const char *CAMERA_PIXFORMAT_NVS_KEY = "pixformat";
 static camera_state_t *s_state = NULL;
 static camera_config_t s_saved_config;
 
@@ -55,6 +53,10 @@ static const sensor_func_t g_sensors[] = {
 
 static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out_camera_model)
 {
+    gpio_config_t conf = {};
+    int camera_model_id;
+    uint8_t slv_addr = 0x0;
+
     esp_err_t ret = ESP_OK;
     *out_camera_model = CAMERA_NONE;
     if (s_state != NULL) {
@@ -86,36 +88,33 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
 
     if (config->pin_pwdn >= 0) {
         ESP_LOGD(TAG, "Resetting camera by power down line");
-        gpio_config_t conf = { 0 };
+        // conf = { 0 };
         conf.pin_bit_mask = 1LL << config->pin_pwdn;
         conf.mode = GPIO_MODE_OUTPUT;
         gpio_config(&conf);
 
         // careful, logic is inverted compared to reset pin
-        gpio_set_level(config->pin_pwdn, 1);
+        gpio_set_level((gpio_num_t)config->pin_pwdn, 1);
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        gpio_set_level(config->pin_pwdn, 0);
+        gpio_set_level((gpio_num_t)config->pin_pwdn, 0);
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 
     if (config->pin_reset >= 0) {
         ESP_LOGD(TAG, "Resetting camera");
-        gpio_config_t conf = { 0 };
+        // conf = { 0 };
         conf.pin_bit_mask = 1LL << config->pin_reset;
         conf.mode = GPIO_MODE_OUTPUT;
         gpio_config(&conf);
 
-        gpio_set_level(config->pin_reset, 0);
+        gpio_set_level((gpio_num_t)config->pin_reset, 0);
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        gpio_set_level(config->pin_reset, 1);
+        gpio_set_level((gpio_num_t)config->pin_reset, 1);
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 
     ESP_LOGD(TAG, "Searching for camera address");
     vTaskDelay(10 / portTICK_PERIOD_MS);
-
-    int camera_model_id;
-    uint8_t slv_addr = 0x0;
 
     /**
      * This loop probes each known sensor until a supported camera is detected
@@ -188,6 +187,10 @@ static pixformat_t get_output_data_format(camera_conv_mode_t conv_mode)
 esp_err_t cam_init(const camera_config_t *config)
 {
     esp_err_t err;
+    
+    framesize_t frame_size;
+    pixformat_t pix_format;
+
     s_saved_config = *config;
     err = cam_hal_init(config);
     if (err != ESP_OK) {
@@ -202,8 +205,8 @@ esp_err_t cam_init(const camera_config_t *config)
         goto fail;
     }
 
-    framesize_t frame_size = (framesize_t) config->frame_size;
-    pixformat_t pix_format = (pixformat_t) config->pixel_format;
+    frame_size = (framesize_t) config->frame_size;
+    pix_format = (pixformat_t) config->pixel_format;
 
     if (PIXFORMAT_JPEG == pix_format && (!camera_sensor[camera_model].support_jpeg)) {
         ESP_LOGE(TAG, "JPEG format is not supported on this sensor");

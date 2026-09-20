@@ -106,6 +106,9 @@ bool jpg2rgb565(const uint8_t *src, size_t src_len, uint8_t * out, esp_jpeg_imag
 
 bool jpg2bmp(const uint8_t *src, size_t src_len, uint8_t ** out, size_t * out_len)
 {
+    size_t output_size;
+    bmp_header_t * bitmap;
+
     esp_jpeg_image_cfg_t jpeg_cfg = {
         .indata = (uint8_t *)src,
         .indata_size = src_len,
@@ -127,8 +130,8 @@ bool jpg2bmp(const uint8_t *src, size_t src_len, uint8_t ** out, size_t * out_le
     // @todo here we allocate memory and we assume that the user will free it
     // this is not the best way to do it, but we need to keep the API
     // compatible with the previous version
-    const size_t output_size = output_img.output_len + BMP_HEADER_LEN;
-    output = _malloc(output_size);
+    output_size = output_img.output_len + BMP_HEADER_LEN;
+    output = (uint8_t*)_malloc(output_size);
     if (!output) {
         ESP_LOGE(TAG, "Failed to allocate output buffer");
         goto fail;
@@ -144,7 +147,7 @@ bool jpg2bmp(const uint8_t *src, size_t src_len, uint8_t ** out, size_t * out_le
 
     output[0] = 'B';
     output[1] = 'M';
-    bmp_header_t * bitmap  = (bmp_header_t*)&output[2];
+    bitmap  = (bmp_header_t*)&output[2];
     bitmap->reserved = 0;
     bitmap->filesize = output_size;
     bitmap->fileoffset_to_pixelarray = BMP_HEADER_LEN;

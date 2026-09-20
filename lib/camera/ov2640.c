@@ -40,7 +40,7 @@ static int write_regs(sensor_t *sensor, const uint8_t (*regs)[2])
     int i=0, res = 0;
     while (regs[i][0]) {
         if (regs[i][0] == BANK_SEL) {
-            res = set_bank(sensor, regs[i][1]);
+            res = set_bank(sensor, (ov2640_bank_t)regs[i][1]);
         } else {
             res = SCCB_Write(sensor->slv_addr, regs[i][0], regs[i][1]);
         }
@@ -66,7 +66,7 @@ static int set_reg_bits(sensor_t *sensor, uint8_t bank, uint8_t reg, uint8_t off
     int ret = 0;
     uint8_t c_value, new_value;
 
-    ret = set_bank(sensor, bank);
+    ret = set_bank(sensor, (ov2640_bank_t)bank);
     if(ret) {
         return ret;
     }
@@ -86,7 +86,7 @@ static int read_reg(sensor_t *sensor, ov2640_bank_t bank, uint8_t reg)
 
 static uint8_t get_reg_bits(sensor_t *sensor, uint8_t bank, uint8_t reg, uint8_t offset, uint8_t mask)
 {
-    return (read_reg(sensor, bank, reg) >> offset) & mask;
+    return (read_reg(sensor, (ov2640_bank_t)bank, reg) >> offset) & mask;
 }
 
 static int write_reg_bits(sensor_t *sensor, uint8_t bank, uint8_t reg, uint8_t mask, int enable)
@@ -146,15 +146,15 @@ static int set_window(sensor_t *sensor, ov2640_sensor_mode_t mode, int offset_x,
     h /= 4;
     uint8_t win_regs[][2] = {
         {BANK_SEL, BANK_DSP},
-        {HSIZE, max_x & 0xFF},
-        {VSIZE, max_y & 0xFF},
-        {XOFFL, offset_x & 0xFF},
-        {YOFFL, offset_y & 0xFF},
-        {VHYX, ((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) | ((offset_x >> 8) & 0X07)},
-        {TEST, (max_x >> 2) & 0X80},
-        {ZMOW, (w)&0xFF},
-        {ZMOH, (h)&0xFF},
-        {ZMHH, ((h>>6)&0x04)|((w>>8)&0x03)},
+        {HSIZE, static_cast<uint8_t>(max_x & 0xFF)},
+        {VSIZE, static_cast<uint8_t>(max_y & 0xFF)},
+        {XOFFL, static_cast<uint8_t>(offset_x & 0xFF)},
+        {YOFFL, static_cast<uint8_t>(offset_y & 0xFF)},
+        {VHYX, static_cast<uint8_t>(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) | ((offset_x >> 8) & 0X07))},
+        {TEST, static_cast<uint8_t>((max_x >> 2) & 0X80)},
+        {ZMOW, static_cast<uint8_t>((w)&0xFF)},
+        {ZMOH, static_cast<uint8_t>((h)&0xFF)},
+        {ZMHH, static_cast<uint8_t>(((h>>6)&0x04)|((w>>8)&0x03))},
         {0, 0}
     };
 
@@ -466,7 +466,7 @@ static int set_denoise(sensor_t *sensor, int level)
 
 static int get_reg(sensor_t *sensor, int reg, int mask)
 {
-    int ret = read_reg(sensor, (reg >> 8) & 0x01, reg & 0xFF);
+    int ret = read_reg(sensor, (ov2640_bank_t)((reg >> 8) & 0x01), reg & 0xFF);
     if(ret > 0){
         ret &= mask;
     }
@@ -476,12 +476,12 @@ static int get_reg(sensor_t *sensor, int reg, int mask)
 static int set_reg(sensor_t *sensor, int reg, int mask, int value)
 {
     int ret = 0;
-    ret = read_reg(sensor, (reg >> 8) & 0x01, reg & 0xFF);
+    ret = read_reg(sensor, (ov2640_bank_t)((reg >> 8) & 0x01), reg & 0xFF);
     if(ret < 0){
         return ret;
     }
     value = (ret & ~mask) | (value & mask);
-    ret = write_reg(sensor, (reg >> 8) & 0x01, reg & 0xFF, value);
+    ret = write_reg(sensor, (ov2640_bank_t)((reg >> 8) & 0x01), reg & 0xFF, value);
     return ret;
 }
 

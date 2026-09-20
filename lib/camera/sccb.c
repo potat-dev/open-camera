@@ -61,11 +61,11 @@ int SCCB_Init(int pin_sda, int pin_scl)
     conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
     conf.master.clk_speed = SCCB_FREQ;
 
-    if ((ret =  i2c_param_config(sccb_i2c_port, &conf)) != ESP_OK) {
+    if ((ret =  i2c_param_config((i2c_port_t)sccb_i2c_port, &conf)) != ESP_OK) {
         return ret;
     }
 
-    return i2c_driver_install(sccb_i2c_port, conf.mode, 0, 0, 0);
+    return i2c_driver_install((i2c_port_t)sccb_i2c_port, conf.mode, 0, 0, 0);
 }
 
 int SCCB_Use_Port(int i2c_num) { // sccb use an already initialized I2C port
@@ -86,7 +86,7 @@ int SCCB_Deinit(void)
         return ESP_OK;
     }
     sccb_owns_i2c_port = false;
-    return i2c_driver_delete(sccb_i2c_port);
+    return i2c_driver_delete((i2c_port_t)sccb_i2c_port);
 }
 
 int SCCB_Probe(uint8_t slv_addr)
@@ -95,7 +95,7 @@ int SCCB_Probe(uint8_t slv_addr)
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, ( slv_addr << 1 ) | WRITE_BIT, ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    esp_err_t ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     return ret;
 }
@@ -109,15 +109,15 @@ uint8_t SCCB_Read(uint8_t slv_addr, uint8_t reg)
     i2c_master_write_byte(cmd, ( slv_addr << 1 ) | WRITE_BIT, ACK_CHECK_EN);
     i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) return -1;
     cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, ( slv_addr << 1 ) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &data, NACK_VAL);
+    i2c_master_read_byte(cmd, &data, (i2c_ack_type_t)NACK_VAL);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) {
         ESP_LOGE(TAG, "SCCB_Read Failed addr:0x%02x, reg:0x%02x, data:0x%02x, ret:%d", slv_addr, reg, data, ret);
@@ -134,7 +134,7 @@ int SCCB_Write(uint8_t slv_addr, uint8_t reg, uint8_t data)
     i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
     i2c_master_write_byte(cmd, data, ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) {
         ESP_LOGE(TAG, "SCCB_Write Failed addr:0x%02x, reg:0x%02x, data:0x%02x, ret:%d", slv_addr, reg, data, ret);
@@ -154,15 +154,15 @@ uint8_t SCCB_Read16(uint8_t slv_addr, uint16_t reg)
     i2c_master_write_byte(cmd, reg_u8[0], ACK_CHECK_EN);
     i2c_master_write_byte(cmd, reg_u8[1], ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) return -1;
     cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, ( slv_addr << 1 ) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &data, NACK_VAL);
+    i2c_master_read_byte(cmd, &data, (i2c_ack_type_t)NACK_VAL);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) {
         ESP_LOGE(TAG, "W [%04x]=%02x fail\n", reg, data);
@@ -183,7 +183,7 @@ int SCCB_Write16(uint8_t slv_addr, uint16_t reg, uint8_t data)
     i2c_master_write_byte(cmd, reg_u8[1], ACK_CHECK_EN);
     i2c_master_write_byte(cmd, data, ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) {
         ESP_LOGE(TAG, "W [%04x]=%02x %d fail\n", reg, data, i++);
@@ -204,17 +204,17 @@ uint16_t SCCB_Read_Addr16_Val16(uint8_t slv_addr, uint16_t reg)
     i2c_master_write_byte(cmd, reg_u8[0], ACK_CHECK_EN);
     i2c_master_write_byte(cmd, reg_u8[1], ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) return -1;
 
     cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, ( slv_addr << 1 ) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &data_u8[1], ACK_VAL);
-    i2c_master_read_byte(cmd, &data_u8[0], NACK_VAL);
+    i2c_master_read_byte(cmd, &data_u8[1], (i2c_ack_type_t)ACK_VAL);
+    i2c_master_read_byte(cmd, &data_u8[0], (i2c_ack_type_t)NACK_VAL);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) {
         ESP_LOGE(TAG, "W [%04x]=%04x fail\n", reg, data);
@@ -237,7 +237,7 @@ int SCCB_Write_Addr16_Val16(uint8_t slv_addr, uint16_t reg, uint16_t data)
     i2c_master_write_byte(cmd, data_u8[0], ACK_CHECK_EN);
     i2c_master_write_byte(cmd, data_u8[1], ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
+    ret = i2c_master_cmd_begin((i2c_port_t)sccb_i2c_port, cmd, 1000 / portTICK_RATE_MS);
     i2c_cmd_link_delete(cmd);
     if(ret != ESP_OK) {
         ESP_LOGE(TAG, "W [%04x]=%04x fail\n", reg, data);

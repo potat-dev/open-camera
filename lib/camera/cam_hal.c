@@ -258,7 +258,7 @@ static void cam_task(void *arg)
     int cnt = 0;
     int frame_pos = 0;
     cam_obj->state = CAM_STATE_IDLE;
-    cam_event_t cam_event = 0;
+    cam_event_t cam_event = CAM_IN_SUC_EOF_EVENT;
 
     xQueueReset(cam_obj->event_queue);
 
@@ -600,6 +600,10 @@ err:
 
 esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint16_t sensor_pid)
 {
+    framesize_t alloc_size;
+    size_t queue_size;
+    size_t frame_buffer_queue_len;
+
     CAM_CHECK(NULL != config, "config pointer is invalid", ESP_ERR_INVALID_ARG);
     esp_err_t ret = ESP_OK;
 
@@ -630,7 +634,7 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
         cam_obj->fb_size = cam_obj->recv_size;
     } else {
         cam_obj->recv_size = cam_obj->width * cam_obj->height * cam_obj->in_bytes_per_pixel;
-        framesize_t alloc_size = frame_size;
+        alloc_size = frame_size;
         if (config->max_frame_size > frame_size && config->max_frame_size < FRAMESIZE_INVALID) {
             alloc_size = config->max_frame_size;
         }
@@ -640,14 +644,14 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     ret = cam_dma_config(config);
     CAM_CHECK_GOTO(ret == ESP_OK, "cam_dma_config failed", err);
 
-    size_t queue_size = cam_obj->dma_half_buffer_cnt - 1;
+    queue_size = cam_obj->dma_half_buffer_cnt - 1;
     if (queue_size == 0) {
         queue_size = 1;
     }
     cam_obj->event_queue = xQueueCreate(queue_size, sizeof(cam_event_t));
     CAM_CHECK_GOTO(cam_obj->event_queue != NULL, "event_queue create failed", err);
 
-    size_t frame_buffer_queue_len = cam_obj->frame_cnt;
+    frame_buffer_queue_len = cam_obj->frame_cnt;
     if (config->grab_mode == CAMERA_GRAB_LATEST && cam_obj->frame_cnt > 1) {
         frame_buffer_queue_len = cam_obj->frame_cnt - 1;
     }

@@ -373,18 +373,18 @@ void cam_s3_vsync_intr_enable(cam_obj_t *cam, bool en)
 esp_err_t cam_s3_set_pin(cam_obj_t *cam, const camera_config_t *config)
 {
     PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[config->pin_pclk], PIN_FUNC_GPIO);
-    gpio_set_direction(config->pin_pclk, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(config->pin_pclk, GPIO_FLOATING);
+    gpio_set_direction((gpio_num_t)config->pin_pclk, GPIO_MODE_INPUT);
+    gpio_set_pull_mode((gpio_num_t)config->pin_pclk, GPIO_FLOATING);
     gpio_matrix_in(config->pin_pclk, CAM_PCLK_IDX, false);
 
     PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[config->pin_vsync], PIN_FUNC_GPIO);
-    gpio_set_direction(config->pin_vsync, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(config->pin_vsync, GPIO_FLOATING);
+    gpio_set_direction((gpio_num_t)config->pin_vsync, GPIO_MODE_INPUT);
+    gpio_set_pull_mode((gpio_num_t)config->pin_vsync, GPIO_FLOATING);
     gpio_matrix_in(config->pin_vsync, CAM_V_SYNC_IDX, cam->vsync_invert);
 
     PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[config->pin_href], PIN_FUNC_GPIO);
-    gpio_set_direction(config->pin_href, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(config->pin_href, GPIO_FLOATING);
+    gpio_set_direction((gpio_num_t)config->pin_href, GPIO_MODE_INPUT);
+    gpio_set_pull_mode((gpio_num_t)config->pin_href, GPIO_FLOATING);
     gpio_matrix_in(config->pin_href, CAM_H_ENABLE_IDX, false);
 
     int data_pins[8] = {
@@ -392,14 +392,14 @@ esp_err_t cam_s3_set_pin(cam_obj_t *cam, const camera_config_t *config)
     };
     for (int i = 0; i < 8; i++) {
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[data_pins[i]], PIN_FUNC_GPIO);
-        gpio_set_direction(data_pins[i], GPIO_MODE_INPUT);
-        gpio_set_pull_mode(data_pins[i], GPIO_FLOATING);
+        gpio_set_direction((gpio_num_t)data_pins[i], GPIO_MODE_INPUT);
+        gpio_set_pull_mode((gpio_num_t)data_pins[i], GPIO_FLOATING);
         gpio_matrix_in(data_pins[i], CAM_DATA_IN0_IDX + i, false);
     }
     if (config->pin_xclk >= 0) { 
         PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[config->pin_xclk], PIN_FUNC_GPIO);
-        gpio_set_direction(config->pin_xclk, GPIO_MODE_OUTPUT);
-        gpio_set_pull_mode(config->pin_xclk, GPIO_FLOATING);
+        gpio_set_direction((gpio_num_t)config->pin_xclk, GPIO_MODE_OUTPUT);
+        gpio_set_pull_mode((gpio_num_t)config->pin_xclk, GPIO_FLOATING);
         gpio_matrix_out(config->pin_xclk, CAM_CLK_IDX, false, false);
     }
 
