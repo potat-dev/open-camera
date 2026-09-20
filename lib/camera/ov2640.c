@@ -146,15 +146,15 @@ static int set_window(sensor_t *sensor, ov2640_sensor_mode_t mode, int offset_x,
     h /= 4;
     uint8_t win_regs[][2] = {
         {BANK_SEL, BANK_DSP},
-        {HSIZE, static_cast<uint8_t>(max_x & 0xFF)},
-        {VSIZE, static_cast<uint8_t>(max_y & 0xFF)},
-        {XOFFL, static_cast<uint8_t>(offset_x & 0xFF)},
-        {YOFFL, static_cast<uint8_t>(offset_y & 0xFF)},
-        {VHYX, static_cast<uint8_t>(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) | ((offset_x >> 8) & 0X07))},
-        {TEST, static_cast<uint8_t>((max_x >> 2) & 0X80)},
-        {ZMOW, static_cast<uint8_t>((w)&0xFF)},
-        {ZMOH, static_cast<uint8_t>((h)&0xFF)},
-        {ZMHH, static_cast<uint8_t>(((h>>6)&0x04)|((w>>8)&0x03))},
+        {HSIZE, (uint8_t)(max_x & 0xFF)},
+        {VSIZE, (uint8_t)(max_y & 0xFF)},
+        {XOFFL, (uint8_t)(offset_x & 0xFF)},
+        {YOFFL, (uint8_t)(offset_y & 0xFF)},
+        {VHYX, (uint8_t)(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) | ((offset_x >> 8) & 0X07))},
+        {TEST, (uint8_t)((max_x >> 2) & 0X80)},
+        {ZMOW, (uint8_t)((w)&0xFF)},
+        {ZMOH, (uint8_t)((h)&0xFF)},
+        {ZMHH, (uint8_t)(((h>>6)&0x04)|((w>>8)&0x03))},
         {0, 0}
     };
 

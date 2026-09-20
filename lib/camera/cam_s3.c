@@ -90,7 +90,8 @@ static void CAMERA_ISR_IRAM_ATTR cam_s3_vsync_isr(void *arg)
     cam_obj_t *cam = (cam_obj_t *)arg;
     BaseType_t HPTaskAwoken = pdFALSE;
 
-    typeof(LCD_CAM.lc_dma_int_st) status = LCD_CAM.lc_dma_int_st;
+    lcd_cam_lc_dma_int_st_reg_t status;
+    status.val = LCD_CAM.lc_dma_int_st.val;
     if (status.val == 0) {
         return;
     }
@@ -112,14 +113,14 @@ static void CAMERA_ISR_IRAM_ATTR cam_s3_dma_isr(void *arg)
     cam_obj_t *cam = (cam_obj_t *)arg;
     BaseType_t HPTaskAwoken = pdFALSE;
 
-    typeof(GDMA.channel[cam->dma_num].in.int_st) status = GDMA.channel[cam->dma_num].in.int_st;
-    if (status.val == 0) {
+    uint32_t status = GDMA.channel[cam->dma_num].in.int_st.val;
+    if (status == 0) {
         return;
     }
 
-    GDMA.channel[cam->dma_num].in.int_clr.val = status.val;
+    GDMA.channel[cam->dma_num].in.int_clr.val = status;
 
-    if (status.in_suc_eof) {
+    if (status & GDMA_IN_SUC_EOF_CH0_INT_ST_M) {
         cam_s3_send_event(cam, CAM_IN_SUC_EOF_EVENT, &HPTaskAwoken);
     }
 
@@ -196,9 +197,8 @@ static esp_err_t cam_s3_dma_init(cam_obj_t *cam)
 {
     //alloc rx gdma channel
 #if (ESP_IDF_VERSION_MAJOR < 6)
-    gdma_channel_alloc_config_t rx_alloc_config = {
-        .direction = GDMA_CHANNEL_DIRECTION_RX,
-    };
+    gdma_channel_alloc_config_t rx_alloc_config = { };
+    rx_alloc_config.direction = GDMA_CHANNEL_DIRECTION_RX;
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
     esp_err_t ret = gdma_new_ahb_channel(&rx_alloc_config, &cam->dma_channel_handle);
 #else
