@@ -51,6 +51,14 @@ static cam_obj_t *cam_obj = NULL;
 #define CAMERA_PSRAM_DMA_ENABLED 0
 #endif
 
+#ifndef CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX
+#define CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX (32 * 1024)
+#endif
+
+// 64 descriptors * 16 bytes = 1 KB in internal DMA RAM.
+// Sufficient to ring-buffer any node size down to 512 bytes without overflow.
+#define CAM_DMA_MAX_DESCRIPTORS 64
+
 static volatile bool g_psram_dma_mode = CAMERA_PSRAM_DMA_ENABLED;
 static portMUX_TYPE g_psram_dma_lock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -222,14 +230,13 @@ static bool cam_get_next_frame(int * frame_pos)
     return false;
 }
 
-static bool cam_start_frame(int * frame_pos)
-{
+static bool cam_start_frame(int* frame_pos) {
     if (cam_get_next_frame(frame_pos)) {
-        if(cam_s3_start(cam_obj, *frame_pos)){
+        if (cam_s3_start(cam_obj, *frame_pos)) {
             // Vsync the frame manually
-            cam_s3_do_vsync(cam_obj);
-            uint64_t us = (uint64_t)esp_timer_get_time();
-            cam_obj->frames[*frame_pos].fb.timestamp.tv_sec = us / 1000000UL;
+            // cam_s3_do_vsync(cam_obj);
+            uint64_t us                                      = (uint64_t)esp_timer_get_time();
+            cam_obj->frames[*frame_pos].fb.timestamp.tv_sec  = us / 1000000UL;
             cam_obj->frames[*frame_pos].fb.timestamp.tv_usec = us % 1000000UL;
             return true;
         }
@@ -450,15 +457,11 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
         return ESP_FAIL;
     }
 
-    cam_obj->dma_node_cnt = (cam_obj->dma_buffer_size) / cam_obj->dma_node_buffer_size; // Number of DMA nodes
-    cam_obj->frame_copy_cnt = cam_obj->recv_size / cam_obj->dma_half_buffer_size; // Number of interrupted copies, ping-pong copy
+    cam_obj->dma_node_cnt = (cam_obj->dma_buffer_size) / cam_obj->dma_node_buffer_size;
+    cam_obj->frame_copy_cnt = cam_obj->recv_size / cam_obj->dma_half_buffer_size;
     if (cam_obj->psram_mode) {
         cam_obj->frame_copy_cnt++;
     }
-
-    ESP_LOGI(TAG, "buffer_size: %d, half_buffer_size: %d, node_buffer_size: %d, node_cnt: %d, total_cnt: %d",
-             (int) cam_obj->dma_buffer_size, (int) cam_obj->dma_half_buffer_size, (int) cam_obj->dma_node_buffer_size,
-             (int) cam_obj->dma_node_cnt, (int) cam_obj->frame_copy_cnt);
 
     cam_obj->dma_buffer = NULL;
     cam_obj->dma = NULL;
@@ -476,7 +479,7 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
         fb_size += cam_obj->dma_half_buffer_size;
     }
 
-    /* Allocate memory for frame buffer */
+    /* Allocate memory for PSRAM frame buffers (sized for max_framesize) */
     size_t alloc_size = fb_size * sizeof(uint8_t) + dma_align;
     uint32_t _caps = MALLOC_CAP_8BIT;
     if (CAMERA_FB_IN_DRAM == config->fb_location) {
@@ -484,91 +487,110 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
     } else {
         _caps |= MALLOC_CAP_SPIRAM;
     }
+
     for (int x = 0; x < cam_obj->frame_cnt; x++) {
         cam_obj->frames[x].dma = NULL;
         cam_obj->frames[x].fb_offset = 0;
         cam_obj->frames[x].en = 0;
-        ESP_LOGI(TAG, "Allocating %d Byte frame buffer in %s", alloc_size, _caps & MALLOC_CAP_SPIRAM ? "PSRAM" : "OnBoard RAM");
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 0)
-        // In IDF v4.2 and earlier, memory returned by heap_caps_aligned_alloc must be freed using heap_caps_aligned_free.
-        // And heap_caps_aligned_free is deprecated on v4.3.
         cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_aligned_alloc(16, alloc_size, _caps);
-#else
-        cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(alloc_size, _caps);
-#endif
         CAM_CHECK(cam_obj->frames[x].fb.buf != NULL, "frame buffer malloc failed", ESP_FAIL);
-        if (cam_obj->psram_mode) {
-            //align PSRAM buffer. TODO: save the offset so proper address can be freed later
-            cam_obj->frames[x].fb_offset = dma_align - ((uint32_t)cam_obj->frames[x].fb.buf & (dma_align - 1));
-            cam_obj->frames[x].fb.buf += cam_obj->frames[x].fb_offset;
-            ESP_LOGI(TAG, "Frame[%d]: Offset: %u, Addr: 0x%08X", x, cam_obj->frames[x].fb_offset, (unsigned) cam_obj->frames[x].fb.buf);
-            cam_obj->frames[x].dma = allocate_dma_descriptors(cam_obj->dma_node_cnt, cam_obj->dma_node_buffer_size, cam_obj->frames[x].fb.buf);
-            CAM_CHECK(cam_obj->frames[x].dma != NULL, "frame dma malloc failed", ESP_FAIL);
-        }
         cam_obj->frames[x].en = 1;
     }
 
+    /* Allocate internal SRAM DMA buffer and descriptor pool for maximum possible capacity */
     if (!cam_obj->psram_mode) {
-        cam_obj->dma_buffer = (uint8_t *)heap_caps_malloc(cam_obj->dma_buffer_size * sizeof(uint8_t), MALLOC_CAP_DMA);
-        if(NULL == cam_obj->dma_buffer) {
-            ESP_LOGE(TAG,"%s(%d): DMA buffer %d Byte malloc failed, the current largest free block:%d Byte", __FUNCTION__, __LINE__,
-                     (int) cam_obj->dma_buffer_size, (int) heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+        // 1. Allocate full 32KB buffer so switching up to UXGA (32000 bytes) never overflows
+        cam_obj->dma_buffer = (uint8_t *)heap_caps_malloc(CONFIG_CAMERA_DMA_BUFFER_SIZE_MAX, MALLOC_CAP_DMA);
+        if (NULL == cam_obj->dma_buffer) {
+            ESP_LOGE(TAG, "DMA buffer malloc failed");
             return ESP_FAIL;
         }
 
-        cam_obj->dma = allocate_dma_descriptors(cam_obj->dma_node_cnt, cam_obj->dma_node_buffer_size, cam_obj->dma_buffer);
-        CAM_CHECK(cam_obj->dma != NULL, "dma malloc failed", ESP_FAIL);
+        // 2. Allocate fixed pool of 64 descriptors in DMA RAM
+        cam_obj->dma = (lldesc_t *)heap_caps_malloc(CAM_DMA_MAX_DESCRIPTORS * sizeof(lldesc_t), MALLOC_CAP_DMA);
+        if (NULL == cam_obj->dma) {
+            ESP_LOGE(TAG, "DMA descriptors malloc failed");
+            return ESP_FAIL;
+        }
+
+        // 3. Link the active initial ring (dma_node_cnt nodes)
+        for (int x = 0; x < cam_obj->dma_node_cnt; x++) {
+            cam_obj->dma[x].size = cam_obj->dma_node_buffer_size;
+            cam_obj->dma[x].length = 0;
+            cam_obj->dma[x].sosf = 0;
+            cam_obj->dma[x].eof = 0;
+            cam_obj->dma[x].owner = 1;
+            cam_obj->dma[x].buf = (cam_obj->dma_buffer + cam_obj->dma_node_buffer_size * x);
+            cam_obj->dma[x].empty = (uint32_t)&cam_obj->dma[(x + 1) % cam_obj->dma_node_cnt];
+        }
     }
 
     return ESP_OK;
 }
 
-esp_err_t cam_reconfigure_raw(framesize_t new_size) {
-    if (!cam_obj) return ESP_ERR_INVALID_STATE;
-    if (new_size >= FRAMESIZE_INVALID) return ESP_ERR_INVALID_ARG;
+esp_err_t cam_reconfigure_raw(framesize_t new_size)
+{
+    if (!cam_obj) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (new_size >= FRAMESIZE_INVALID) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
-    size_t new_recv_size =
-        resolution[new_size].width * resolution[new_size].height * cam_obj->in_bytes_per_pixel;
+    size_t new_recv_size = resolution[new_size].width * resolution[new_size].height * cam_obj->in_bytes_per_pixel;
     if (new_recv_size > cam_obj->fb_size) {
-        ESP_LOGE(TAG, "Frame size %u exceeds allocated buffer (%u > %u)", new_size,
-                 (unsigned)new_recv_size, (unsigned)cam_obj->fb_size);
+        ESP_LOGE(TAG, "Frame size %u exceeds allocated buffer (%u > %u)",
+                 new_size, (unsigned)new_recv_size, (unsigned)cam_obj->fb_size);
         return ESP_ERR_NO_MEM;
     }
 
-    cam_stop();  // stop DMA
+    // 1. Stop DMA
+    cam_stop();
 
-    // update geometry & calculate new DMA sizes FIRST
-    cam_obj->width     = resolution[new_size].width;
-    cam_obj->height    = resolution[new_size].height;
+    // 2. Update dimensions and calculate NEW DMA sizes
+    cam_obj->width = resolution[new_size].width;
+    cam_obj->height = resolution[new_size].height;
     cam_obj->recv_size = new_recv_size;
     cam_s3_dma_sizes(cam_obj);
 
-    // update copy count with the NEW half_buffer_size
+    // 3. Recalculate node count and copy count using the NEW sizes
+    cam_obj->dma_node_cnt = cam_obj->dma_buffer_size / cam_obj->dma_node_buffer_size;
     cam_obj->frame_copy_cnt = cam_obj->recv_size / cam_obj->dma_half_buffer_size;
-    if (cam_obj->psram_mode) cam_obj->frame_copy_cnt++;
+    if (cam_obj->psram_mode) {
+        cam_obj->frame_copy_cnt++;
+    }
 
-    // re-link the DMA descriptors to match the new dma_node_buffer_size
+    // Safety check against descriptor pool size
+    if (cam_obj->dma_node_cnt > CAM_DMA_MAX_DESCRIPTORS) {
+        ESP_LOGE(TAG, "Required nodes (%u) exceeds descriptor pool (%u)",
+                 (unsigned)cam_obj->dma_node_cnt, CAM_DMA_MAX_DESCRIPTORS);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // 4. Re-link the pre-allocated descriptors to match the active resolution
     if (!cam_obj->psram_mode && cam_obj->dma) {
         for (int x = 0; x < cam_obj->dma_node_cnt; x++) {
-            cam_obj->dma[x].size   = cam_obj->dma_node_buffer_size;
+            cam_obj->dma[x].size = cam_obj->dma_node_buffer_size;
             cam_obj->dma[x].length = 0;
-            cam_obj->dma[x].sosf   = 0;
-            cam_obj->dma[x].eof    = 0;
-            cam_obj->dma[x].owner  = 1;
-            cam_obj->dma[x].buf    = (cam_obj->dma_buffer + cam_obj->dma_node_buffer_size * x);
-            cam_obj->dma[x].empty  = (uint32_t)&cam_obj->dma[(x + 1) % cam_obj->dma_node_cnt];
+            cam_obj->dma[x].sosf = 0;
+            cam_obj->dma[x].eof = 0;
+            cam_obj->dma[x].owner = 1;
+            cam_obj->dma[x].buf = (cam_obj->dma_buffer + cam_obj->dma_node_buffer_size * x);
+            cam_obj->dma[x].empty = (uint32_t)&cam_obj->dma[(x + 1) % cam_obj->dma_node_cnt];
         }
     }
 
-    // flush queues and reset state
+    // 5. Flush queues and reset state
     cam_give_all();
     xQueueReset(cam_obj->event_queue);
     xQueueReset(cam_obj->frame_buffer_queue);
-    
-    for (int x = 0; x < cam_obj->frame_cnt; x++) cam_obj->frames[x].fb.len = 0;
+    for (int x = 0; x < cam_obj->frame_cnt; x++) {
+        cam_obj->frames[x].fb.len = 0;
+    }
     cam_obj->state = CAM_STATE_IDLE;
 
-    cam_start();  // restart DMA
+    // 6. Restart DMA reception
+    cam_start();
 
     return ESP_OK;
 }
