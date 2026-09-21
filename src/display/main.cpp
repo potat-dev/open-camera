@@ -99,10 +99,10 @@ struct cam_mode_t {
     bool operator==(const cam_mode_t&) const = default;
 };
 
-static cam_mode_t MODE_VIEWFINDER = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2};
-static cam_mode_t MODE_CAPTURE    = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1};
+// static cam_mode_t MODE_VIEWFINDER = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2};
+// static cam_mode_t MODE_CAPTURE    = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1};
 
-static camera_config_t build_camera_config(const cam_mode_t& mode) {
+static camera_config_t build_camera_config() {
     camera_config_t config = {};
 
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -127,10 +127,11 @@ static camera_config_t build_camera_config(const cam_mode_t& mode) {
     config.pin_sccb_sda = CAMERA_SDA;
     config.pin_sccb_scl = CAMERA_SCL;
 
-    config.pixel_format = mode.pixformat;
-    config.frame_size   = mode.framesize;
-    config.fb_count     = mode.fb_count;
+    config.pixel_format   = CAMERA_PIXFORMAT;
+    config.frame_size     = SIZE_VIEWFINDER;
+    config.max_frame_size = SIZE_CAPTURE;
 
+    config.fb_count     = 1;
     config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAMERA_PCLK_FREQ;
 
@@ -184,24 +185,14 @@ static void configure_camera() {
     enable_sde_bits(s, 0x07);
 }
 
-// TODO: improve
-bool camera_init(const cam_mode_t& mode = MODE_VIEWFINDER) {
+bool camera_init() {
     cam_deinit();
 
-    camera_config_t config = build_camera_config(MODE_CAPTURE);
+    camera_config_t config = build_camera_config();
     if (cam_init(&config) != ESP_OK) {
         Serial.println("Error: Camera initialization failed");
         return false;
     }
-
-    // TODO: changing size to SIZE_VIEWFINDER
-    // seems to leave horizontal stripes on the resilting frame
-    // need to fix
-    cam_set_raw_framesize(SIZE_VIEWFINDER);
-
-    // also framerate in viewfinder is shit after this
-    // because fb_count = 1
-    // TODO: improve
 
     configure_camera();
     return true;
@@ -363,7 +354,7 @@ void setup() {
     findNextPhotoIndex();
     unmountSD();
 
-    bool cam_ok = camera_init(MODE_VIEWFINDER);  // TODO: improve
+    bool cam_ok = camera_init();
     if (!cam_ok) {
         Serial.println("Fatal: Camera initialization failed");
         return;
