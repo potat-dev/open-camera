@@ -523,46 +523,52 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
     return ESP_OK;
 }
 
-esp_err_t cam_reconfigure_raw(framesize_t new_size)
-{
-    if (!cam_obj) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (new_size >= FRAMESIZE_INVALID) {
-        return ESP_ERR_INVALID_ARG;
-    }
+esp_err_t cam_reconfigure_raw(framesize_t new_size) {
+    if (!cam_obj) return ESP_ERR_INVALID_STATE;
+    if (new_size >= FRAMESIZE_INVALID) return ESP_ERR_INVALID_ARG;
 
-    size_t new_recv_size = resolution[new_size].width * resolution[new_size].height * cam_obj->in_bytes_per_pixel;
+    size_t new_recv_size =
+        resolution[new_size].width * resolution[new_size].height * cam_obj->in_bytes_per_pixel;
     if (new_recv_size > cam_obj->fb_size) {
-        ESP_LOGE(TAG, "Frame size %u exceeds allocated buffer (%u > %u)",
-                 new_size, (unsigned)new_recv_size, (unsigned)cam_obj->fb_size);
+        ESP_LOGE(TAG, "Frame size %u exceeds allocated buffer (%u > %u)", new_size,
+                 (unsigned)new_recv_size, (unsigned)cam_obj->fb_size);
         return ESP_ERR_NO_MEM;
     }
 
-    /* stop DMA and disable VSYNC int */
-    cam_stop();
+    cam_stop();  // stop DMA
 
-    /* upd DMA descriptors */
-    cam_obj->width = resolution[new_size].width;
-    cam_obj->height = resolution[new_size].height;
+    // update geometry & calculate new DMA sizes FIRST
+    cam_obj->width     = resolution[new_size].width;
+    cam_obj->height    = resolution[new_size].height;
     cam_obj->recv_size = new_recv_size;
+    cam_s3_dma_sizes(cam_obj);
+
+    // update copy count with the NEW half_buffer_size
     cam_obj->frame_copy_cnt = cam_obj->recv_size / cam_obj->dma_half_buffer_size;
-    if (cam_obj->psram_mode) {
-        cam_obj->frame_copy_cnt++;
+    if (cam_obj->psram_mode) cam_obj->frame_copy_cnt++;
+
+    // re-link the DMA descriptors to match the new dma_node_buffer_size
+    if (!cam_obj->psram_mode && cam_obj->dma) {
+        for (int x = 0; x < cam_obj->dma_node_cnt; x++) {
+            cam_obj->dma[x].size   = cam_obj->dma_node_buffer_size;
+            cam_obj->dma[x].length = 0;
+            cam_obj->dma[x].sosf   = 0;
+            cam_obj->dma[x].eof    = 0;
+            cam_obj->dma[x].owner  = 1;
+            cam_obj->dma[x].buf    = (cam_obj->dma_buffer + cam_obj->dma_node_buffer_size * x);
+            cam_obj->dma[x].empty  = (uint32_t)&cam_obj->dma[(x + 1) % cam_obj->dma_node_cnt];
+        }
     }
 
-    /* flush queues and reset state */
+    // flush queues and reset state
     cam_give_all();
     xQueueReset(cam_obj->event_queue);
     xQueueReset(cam_obj->frame_buffer_queue);
-    for (int x = 0; x < cam_obj->frame_cnt; x++) {
-        cam_obj->frames[x].fb.len = 0;
-    }
+    
+    for (int x = 0; x < cam_obj->frame_cnt; x++) cam_obj->frames[x].fb.len = 0;
     cam_obj->state = CAM_STATE_IDLE;
 
-    /* re-calculate line descriptors and restart */
-    cam_s3_dma_sizes(cam_obj); 
-    cam_start();
+    cam_start();  // restart DMA
 
     return ESP_OK;
 }

@@ -280,7 +280,7 @@ void capture() {
 
     cam_set_raw_framesize(SIZE_CAPTURE);
 
-    // ESP_LOGI("capture", "Reading dummy frame");
+    ESP_LOGI("capture", "Reading dummy frame");
 
     // discard dummy frame
     // TODO: propably can be safely removed now (needs validation)

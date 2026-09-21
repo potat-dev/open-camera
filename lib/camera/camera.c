@@ -339,30 +339,22 @@ esp_err_t cam_reconfigure(const camera_config_t *config)
     return cam_init(&s_saved_config);
 }
 
-esp_err_t cam_set_raw_framesize(framesize_t framesize)
-{
-    if (s_state == NULL) {
-        return ESP_ERR_INVALID_STATE;
-    }
+esp_err_t cam_set_raw_framesize(framesize_t framesize) {
+    if (s_state == NULL) return ESP_ERR_INVALID_STATE;
 
-    if (s_state->sensor.pixformat == PIXFORMAT_JPEG) {
-        return s_state->sensor.set_framesize(&s_state->sensor, framesize);
-    }
+    // pause DMA before touching sensor registers
+    cam_stop();
 
-    /* configure DMA thresholds */
-    esp_err_t ret = cam_reconfigure_raw(framesize);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    /* set framesize while preserving DSP statistics */
+    // reprogram sensor over I2C first (while DMA is paused)
     s_state->sensor.status.framesize = framesize;
     if (s_state->sensor.set_framesize(&s_state->sensor, framesize) != 0) {
         ESP_LOGE(TAG, "Failed to set sensor frame size");
+        cam_start();
         return ESP_ERR_CAMERA_FAILED_TO_SET_FRAME_SIZE;
     }
 
-    return ESP_OK;
+    // reconfigure DMA descriptors to match the new geometry
+    return cam_reconfigure_raw(framesize);
 }
 
 esp_err_t cam_set_color_gains(uint8_t red, uint8_t green, uint8_t blue)
