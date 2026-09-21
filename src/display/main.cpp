@@ -7,9 +7,9 @@
 #include <camera.h>
 #include <esp_timer.h>
 #include <fb_gfx.h>
-#include "img_converters.h"
 
 #include "config.h"
+#include "img_converters.h"
 #include "menu_config.h"
 
 // state
@@ -137,6 +137,7 @@ static camera_config_t build_camera_config(const cam_mode_t& mode) {
     return config;
 }
 
+// TODO: validate if still needed
 static void enable_sde_bits(sensor_t* s, uint8_t bits) {
     s->set_reg(s, 0xFF, 0xFF, 0x00);
     s->set_reg(s, 0x7C, 0xFF, 0x00);
@@ -183,64 +184,24 @@ static void configure_camera() {
     enable_sde_bits(s, 0x07);
 }
 
-struct WhiteBalance {
-    // gains
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-};
-
-WhiteBalance get_white_balance() {
-    sensor_t* s = cam_sensor_get();
-
-    // switch to bank 1 (sensor) to read scene averages
-    s->set_reg(s, 0xFF, 0xFF, 0x01);
-    uint8_t b_avg = s->get_reg(s, 0x05, 0xFF);
-    uint8_t g_avg = s->get_reg(s, 0x06, 0xFF);
-    uint8_t r_avg = s->get_reg(s, 0x07, 0xFF);
-
-    WhiteBalance wb;
-    wb.g = 0x41;  // OV2640 nominal green unity multiplier
-
-    // calculate inverse gains relative to green channel
-    if (r_avg > 0 && g_avg > 0) {
-        wb.r = constrain((uint16_t)g_avg * 0x41 / r_avg, 0x20, 0xA0);
-    } else {
-        wb.r = 0x5E;  // sunny default fallback
-    }
-
-    if (b_avg > 0 && g_avg > 0) {
-        wb.b = constrain((uint16_t)g_avg * 0x41 / b_avg, 0x20, 0xA0);
-    } else {
-        wb.b = 0x54;  // sunny default fallback
-    }
-
-    return wb;
-}
-
-void apply_white_balance(const WhiteBalance& wb) {
-    sensor_t* s = cam_sensor_get();
-
-    // switch to bank 0 (DSP)
-    s->set_reg(s, 0xFF, 0xFF, 0x00);
-
-    // set 0xC7[6] = 1 to disable auto white balance and lock manual multipliers
-    s->set_reg(s, 0xC7, 0x40, 0x40);
-
-    // write manual channel gain multipliers
-    s->set_reg(s, 0xCC, 0xFF, wb.r);
-    s->set_reg(s, 0xCD, 0xFF, wb.g);
-    s->set_reg(s, 0xCE, 0xFF, wb.b);
-}
-
+// TODO: improve
 bool camera_init(const cam_mode_t& mode = MODE_VIEWFINDER) {
     cam_deinit();
 
-    camera_config_t config = build_camera_config(mode);
+    camera_config_t config = build_camera_config(MODE_CAPTURE);
     if (cam_init(&config) != ESP_OK) {
         Serial.println("Error: Camera initialization failed");
         return false;
     }
+
+    // TODO: changing size to SIZE_VIEWFINDER
+    // seems to leave horizontal stripes on the resilting frame
+    // need to fix
+    cam_set_raw_framesize(SIZE_VIEWFINDER);
+
+    // also framerate in viewfinder is shit after this
+    // because fb_count = 1
+    // TODO: improve
 
     configure_camera();
     return true;
@@ -317,20 +278,16 @@ void capture() {
 
     ESP_LOGI("capture", "Preserving gains and changing mode");
 
-    WhiteBalance wb = get_white_balance();
+    cam_set_raw_framesize(SIZE_CAPTURE);
 
-    // reinit for correct frame and buffer size
-    ok = camera_init(MODE_CAPTURE);
-    if (!ok) {
-        Serial.println("Error: Failed to init camera for capture");
-        return;
-    }
-
-    apply_white_balance(wb);
-
-    ESP_LOGI("capture", "Reading dummy frame");
+    // ESP_LOGI("capture", "Reading dummy frame");
 
     // discard dummy frame
+    // TODO: propably can be safely removed now (needs validation)
+    // UPD: removing this dummy read operation resulted in strange glitches:
+    // top of the frame (roughly 1/8 height) has normal exposure & WB
+    // everything below is over-exposured
+    // and sometimes whole image just has glitched (rainbow) colors
     camera_fb_t* dummy = cam_fb_get();
     if (dummy) cam_fb_return(dummy);
 
@@ -406,7 +363,7 @@ void setup() {
     findNextPhotoIndex();
     unmountSD();
 
-    bool cam_ok = camera_init(MODE_VIEWFINDER);
+    bool cam_ok = camera_init(MODE_VIEWFINDER);  // TODO: improve
     if (!cam_ok) {
         Serial.println("Fatal: Camera initialization failed");
         return;
@@ -453,7 +410,7 @@ void transitionTo(State next) {
     // entry action
     switch (state) {
         case VIEWFINDER:
-            camera_init(MODE_VIEWFINDER);
+            cam_set_raw_framesize(SIZE_VIEWFINDER);
             break;
 
         case COUNTDOWN:
