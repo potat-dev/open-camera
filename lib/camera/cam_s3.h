@@ -1,6 +1,3 @@
-// from target/private_include/ll_cam.h
-// S3 LCD_CAM and GDMA driver prototypes
-
 #pragma once
 
 #include <stdint.h>

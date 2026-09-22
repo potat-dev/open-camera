@@ -1,13 +1,5 @@
-/*
- * This file is part of the OpenMV project.
- * Copyright (c) 2013/2014 Ibrahim Abdelkader <i.abdalkader@gmail.com>
- * This work is licensed under the MIT license, see the file LICENSE for details.
- *
- * OV2640 driver.
- *
- */
-#ifndef __OV2640_H__
-#define __OV2640_H__
+#pragma once
+
 #include "sensor.h"
 /**
  * @brief Detect sensor pid
@@ -18,7 +10,7 @@
  *     0:       Can't detect this sensor
  *     Nonzero: This sensor has been detected
  */
-int esp32_camera_ov2640_detect(int slv_addr, sensor_id_t *id);
+int esp32_camera_ov2640_detect(int slv_addr, sensor_id_t* id);
 
 /**
  * @brief initialize sensor function pointers
@@ -27,6 +19,4 @@ int esp32_camera_ov2640_detect(int slv_addr, sensor_id_t *id);
  * @return
  *      Always 0
  */
-int esp32_camera_ov2640_init(sensor_t *sensor);
-
-#endif // __OV2640_H__
+int esp32_camera_ov2640_init(sensor_t* sensor);

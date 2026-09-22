@@ -1,30 +1,17 @@
-// Copyright 2015-2025 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-#ifndef _IMG_CONVERTERS_H_
-#define _IMG_CONVERTERS_H_
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
+
 #include "camera.h"
 #include "jpeg_decoder.h"
 
-typedef size_t (* jpg_out_cb)(void * arg, size_t index, const void* data, size_t len);
+typedef size_t (*jpg_out_cb)(void* arg, size_t index, const void* data, size_t len);
 
 /**
  * @brief Convert image buffer to JPEG
@@ -40,7 +27,8 @@ typedef size_t (* jpg_out_cb)(void * arg, size_t index, const void* data, size_t
  *
  * @return true on success
  */
-bool fmt2jpg_cb(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality, jpg_out_cb cb, void * arg);
+bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
+                uint8_t quality, jpg_out_cb cb, void* arg);
 
 /**
  * @brief Convert camera frame buffer to JPEG
@@ -52,7 +40,7 @@ bool fmt2jpg_cb(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, p
  *
  * @return true on success
  */
-bool frame2jpg_cb(camera_fb_t * fb, uint8_t quality, jpg_out_cb cb, void * arg);
+bool frame2jpg_cb(camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg);
 
 /**
  * @brief Convert image buffer to JPEG buffer
@@ -69,7 +57,8 @@ bool frame2jpg_cb(camera_fb_t * fb, uint8_t quality, jpg_out_cb cb, void * arg);
  *
  * @return true on success
  */
-bool fmt2jpg(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality, uint8_t ** out, size_t * out_len);
+bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
+             uint8_t quality, uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert camera frame buffer to JPEG buffer
@@ -81,7 +70,7 @@ bool fmt2jpg(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixf
  *
  * @return true on success
  */
-bool frame2jpg(camera_fb_t * fb, uint8_t quality, uint8_t ** out, size_t * out_len);
+bool frame2jpg(camera_fb_t* fb, uint8_t quality, uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert image buffer to BMP buffer
@@ -96,7 +85,8 @@ bool frame2jpg(camera_fb_t * fb, uint8_t quality, uint8_t ** out, size_t * out_l
  *
  * @return true on success
  */
-bool fmt2bmp(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t ** out, size_t * out_len);
+bool fmt2bmp(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
+             uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert camera frame buffer to BMP buffer
@@ -107,7 +97,7 @@ bool fmt2bmp(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixf
  *
  * @return true on success
  */
-bool frame2bmp(camera_fb_t * fb, uint8_t ** out, size_t * out_len);
+bool frame2bmp(camera_fb_t* fb, uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert image buffer to RGB888 buffer (used for face detection)
@@ -119,7 +109,7 @@ bool frame2bmp(camera_fb_t * fb, uint8_t ** out, size_t * out_len);
  *
  * @return true on success
  */
-bool fmt2rgb888(const uint8_t *src_buf, size_t src_len, pixformat_t format, uint8_t * rgb_buf);
+bool fmt2rgb888(const uint8_t* src_buf, size_t src_len, pixformat_t format, uint8_t* rgb_buf);
 
 // Macros for backwards compatibility
 #define JPG_SCALE_NONE JPEG_IMAGE_SCALE_0
@@ -127,7 +117,8 @@ bool fmt2rgb888(const uint8_t *src_buf, size_t src_len, pixformat_t format, uint
 #define JPG_SCALE_4X   JPEG_IMAGE_SCALE_1_4
 #define JPG_SCALE_8X   JPEG_IMAGE_SCALE_1_8
 #define JPG_SCALE_MAX  JPEG_IMAGE_SCALE_1_8
-bool jpg2rgb565(const uint8_t *src, size_t src_len, uint8_t * out, esp_jpeg_image_scale_t scale);
+
+bool jpg2rgb565(const uint8_t* src, size_t src_len, uint8_t* out, esp_jpeg_image_scale_t scale);
 
 /**
  * @brief Chroma subsampling modes for JPEG encoding.
@@ -136,11 +127,7 @@ bool jpg2rgb565(const uint8_t *src, size_t src_len, uint8_t * out, esp_jpeg_imag
  * CHROMA_422: horizontal chroma subsampling (4:2:2)
  * CHROMA_420: horizontal and vertical subsampling (4:2:0)
  */
-typedef enum {
-    CHROMA_444 = 1,
-    CHROMA_422 = 2,
-    CHROMA_420 = 3
-} chroma_t;
+typedef enum { CHROMA_444 = 1, CHROMA_422 = 2, CHROMA_420 = 3 } chroma_t;
 
 /**
  * @brief Set default chroma subsampling mode for JPEG encoding.
@@ -163,5 +150,3 @@ void jpgSetRgb565BE(bool enable);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* _IMG_CONVERTERS_H_ */

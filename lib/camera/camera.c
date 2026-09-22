@@ -1,9 +1,7 @@
-// from driver/esp_camera.c
-// Top-level manager, probing, API entry
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "time.h"
 #include "sys/time.h"
 #include "freertos/FreeRTOS.h"
@@ -12,6 +10,7 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+
 #include "sensor.h"
 #include "sccb.h"
 #include "camera.h"
@@ -88,7 +87,6 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
 
     if (config->pin_pwdn >= 0) {
         ESP_LOGD(TAG, "Resetting camera by power down line");
-        // conf = { 0 };
         conf.pin_bit_mask = 1LL << config->pin_pwdn;
         conf.mode = GPIO_MODE_OUTPUT;
         gpio_config(&conf);
@@ -102,7 +100,6 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
 
     if (config->pin_reset >= 0) {
         ESP_LOGD(TAG, "Resetting camera");
-        // conf = { 0 };
         conf.pin_bit_mask = 1LL << config->pin_reset;
         conf.mode = GPIO_MODE_OUTPUT;
         gpio_config(&conf);
@@ -116,9 +113,7 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
     ESP_LOGD(TAG, "Searching for camera address");
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
-    /**
-     * This loop probes each known sensor until a supported camera is detected
-     */
+    // probe each known sensor until a supported camera is detected
     for(camera_model_id = 0; *out_camera_model == CAMERA_NONE && camera_model_id < CAMERA_MODEL_MAX ; camera_model_id++) {
         slv_addr = camera_sensor[camera_model_id].sccb_addr;
 
@@ -129,12 +124,10 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
         s_state->sensor.slv_addr = slv_addr;
         s_state->sensor.xclk_freq_hz = config->xclk_freq_hz;
 
-        /**
-         * Read sensor ID and then initialize sensor
-         * Attention: Some sensors have the same SCCB address. Therefore, several attempts may be made in the detection process
-         */
+        // Read sensor ID and then initialize sensor
+        // Attention: Some sensors have the same SCCB address
+        // Therefore, several attempts may be made in the detection process
         sensor_id_t *id = &s_state->sensor.id;
-
         for (size_t i = 0; i < sizeof(g_sensors) / sizeof(sensor_func_t); i++) {
             if (g_sensors[i].detect(slv_addr, id)) {
                 ESP_LOGI(TAG, "Camera PID=0x%02x VER=0x%02x MIDL=0x%02x MIDH=0x%02x",
@@ -150,7 +143,8 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
         }
     }
 
-    if (CAMERA_NONE == *out_camera_model) { //If no supported sensors are detected
+    if (CAMERA_NONE == *out_camera_model) { 
+        // no supported sensors are detected
         ESP_LOGE(TAG, "Detected camera not supported.");
         ret = ESP_ERR_NOT_SUPPORTED;
         goto err;
@@ -166,23 +160,6 @@ err :
     CAMERA_DISABLE_OUT_CLOCK();
     return ret;
 }
-
-#if CONFIG_CAMERA_CONVERTER_ENABLED
-static pixformat_t get_output_data_format(camera_conv_mode_t conv_mode)
-{
-    pixformat_t format = PIXFORMAT_RGB565;
-    switch (conv_mode) {
-    case YUV422_TO_YUV420:
-        format = PIXFORMAT_YUV420;
-        break;
-    case YUV422_TO_RGB565: // default format is RGB565
-    default:
-        break;
-    }
-    ESP_LOGD(TAG, "Convert to %d format enabled", format);
-    return format;
-}
-#endif
 
 esp_err_t cam_init(const camera_config_t *config)
 {
@@ -235,11 +212,6 @@ esp_err_t cam_init(const camera_config_t *config)
         goto fail;
     }
     s_state->sensor.set_pixformat(&s_state->sensor, pix_format);
-#if CONFIG_CAMERA_CONVERTER_ENABLED
-    if(config->conv_mode) {
-        s_state->sensor.pixformat = get_output_data_format(config->conv_mode); // If conversion enabled, change the out data format by conversion mode
-    }
-#endif
 
     if (s_state->sensor.id.PID == OV2640_PID) {
         s_state->sensor.set_gainceiling(&s_state->sensor, GAINCEILING_2X);
@@ -366,7 +338,7 @@ esp_err_t cam_set_color_gains(uint8_t red, uint8_t green, uint8_t blue)
 
     if (s->id.PID == OV2640_PID) {
         s->set_reg(s, 0x00FF, 0xFF, 0x00);
-        s->set_reg(s, 0x00C7, 0x40, 0x40); /* locks manual gains */
+        s->set_reg(s, 0x00C7, 0x40, 0x40); // lock manual gains
         s->set_reg(s, 0x00CC, 0xFF, red);
         s->set_reg(s, 0x00CD, 0xFF, green);
         s->set_reg(s, 0x00CE, 0xFF, blue);
