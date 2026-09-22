@@ -431,23 +431,17 @@ static void cam_task(void *arg)
     }
 }
 
-static lldesc_t * allocate_dma_descriptors(uint32_t count, uint16_t size, uint8_t * buffer)
+static void relink_dma_descriptors(cam_obj_t *cam)
 {
-    lldesc_t *dma = (lldesc_t *)heap_caps_malloc(count * sizeof(lldesc_t), MALLOC_CAP_DMA);
-    if (dma == NULL) {
-        return dma;
+    for (int x = 0; x < cam->dma_node_cnt; x++) {
+        cam->dma[x].size   = cam->dma_node_buffer_size;
+        cam->dma[x].length = 0;
+        cam->dma[x].sosf   = 0;
+        cam->dma[x].eof    = 0;
+        cam->dma[x].owner  = 1;
+        cam->dma[x].buf    = (cam->dma_buffer + cam->dma_node_buffer_size * x);
+        cam->dma[x].empty  = (uint32_t)&cam->dma[(x + 1) % cam->dma_node_cnt];
     }
-
-    for (int x = 0; x < count; x++) {
-        dma[x].size = size;
-        dma[x].length = 0;
-        dma[x].sosf = 0;
-        dma[x].eof = 0;
-        dma[x].owner = 1;
-        dma[x].buf = (buffer + size * x);
-        dma[x].empty = (uint32_t)&dma[(x + 1) % count];
-    }
-    return dma;
 }
 
 static esp_err_t cam_dma_config(const camera_config_t *config)
@@ -514,15 +508,7 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
         }
 
         // 3. Link the active initial ring (dma_node_cnt nodes)
-        for (int x = 0; x < cam_obj->dma_node_cnt; x++) {
-            cam_obj->dma[x].size = cam_obj->dma_node_buffer_size;
-            cam_obj->dma[x].length = 0;
-            cam_obj->dma[x].sosf = 0;
-            cam_obj->dma[x].eof = 0;
-            cam_obj->dma[x].owner = 1;
-            cam_obj->dma[x].buf = (cam_obj->dma_buffer + cam_obj->dma_node_buffer_size * x);
-            cam_obj->dma[x].empty = (uint32_t)&cam_obj->dma[(x + 1) % cam_obj->dma_node_cnt];
-        }
+        relink_dma_descriptors(cam_obj);
     }
 
     return ESP_OK;
@@ -568,17 +554,7 @@ esp_err_t cam_reconfigure_raw(framesize_t new_size)
     }
 
     // 4. Re-link the pre-allocated descriptors to match the active resolution
-    if (!cam_obj->psram_mode && cam_obj->dma) {
-        for (int x = 0; x < cam_obj->dma_node_cnt; x++) {
-            cam_obj->dma[x].size = cam_obj->dma_node_buffer_size;
-            cam_obj->dma[x].length = 0;
-            cam_obj->dma[x].sosf = 0;
-            cam_obj->dma[x].eof = 0;
-            cam_obj->dma[x].owner = 1;
-            cam_obj->dma[x].buf = (cam_obj->dma_buffer + cam_obj->dma_node_buffer_size * x);
-            cam_obj->dma[x].empty = (uint32_t)&cam_obj->dma[(x + 1) % cam_obj->dma_node_cnt];
-        }
-    }
+    relink_dma_descriptors(cam_obj);
 
     // 5. Flush queues and reset state
     cam_give_all();
