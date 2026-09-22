@@ -141,9 +141,7 @@ class Menu {
                 snprintf(out, n, "%s", it->value ? "ON" : "OFF");
                 break;
             case MENU_SELECT:
-                snprintf(
-                    out, n, "%s",
-                    (it->options && it->value < it->optionCount) ? it->options[it->value] : "?");
+                snprintf(out, n, "%s", (it->options && it->value < it->optionCount) ? it->options[it->value] : "?");
                 break;
             case MENU_INTEGER:
                 snprintf(out, n, "%d", it->value);

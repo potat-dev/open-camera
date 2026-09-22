@@ -9,11 +9,10 @@ typedef unsigned short uint16;
 typedef unsigned int   uint32;
 typedef unsigned int   uint;
 
-// JPEG chroma subsampling factors. Y_ONLY (grayscale images) and H2V2 (color images) are the most
-// common.
+// JPEG chroma subsampling factors. Y_ONLY (grayscale images) and H2V2 (color images) are the most common
 enum subsampling_t { Y_ONLY = 0, H1V1 = 1, H2V1 = 2, H2V2 = 3 };
 
-// JPEG compression parameters structure.
+// JPEG compression parameters structure
 struct params {
     inline params() : m_quality(85), m_subsampling(H2V2) {}
 
@@ -34,7 +33,7 @@ struct params {
     // 0 = Y (grayscale) only
     // 1 = H1V1 subsampling (YCbCr 1x1x1, 3 blocks per MCU)
     // 2 = H2V1 subsampling (YCbCr 2x1x1, 4 blocks per MCU)
-    // 3 = H2V2 subsampling (YCbCr 4x1x1, 6 blocks per MCU-- very common)
+    // 3 = H2V2 subsampling (YCbCr 4x1x1, 6 blocks per MCU - very common)
     subsampling_t m_subsampling;
 };
 
@@ -61,8 +60,7 @@ class jpeg_encoder {
     // width, height  - Image dimensions.
     // channels - May be 1, or 3. 1 indicates grayscale, 3 indicates RGB source data.
     // Returns false on out of memory or if a stream write fails.
-    bool init(output_stream* pStream, int width, int height, int src_channels,
-              const params& comp_params = params());
+    bool init(output_stream* pStream, int width, int height, int src_channels, const params& comp_params = params());
 
     // Call this method with each source scanline.
     // width * src_channels bytes per scanline is expected (RGB or Y format).

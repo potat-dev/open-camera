@@ -7,8 +7,7 @@
 #include "sys/time.h"
 
 // chip supports camera
-#define cam_SUPPORTED \
-    (CONFIG_IDF_TARGET_ESP32 | CONFIG_IDF_TARGET_ESP32S3 | CONFIG_IDF_TARGET_ESP32S2)
+#define cam_SUPPORTED (CONFIG_IDF_TARGET_ESP32 | CONFIG_IDF_TARGET_ESP32S3 | CONFIG_IDF_TARGET_ESP32S2)
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,13 +31,13 @@ typedef struct {
     int pin_xclk;   // GPIO pin for XCLK line
     union {
         int pin_sccb_sda;  // GPIO pin for SDA line
-        int pin_sscb_sda __attribute__((
-            deprecated("please use pin_sccb_sda instead")));  // GPIO pin for SDA line (legacy name)
+        int pin_sscb_sda
+            __attribute__((deprecated("please use pin_sccb_sda instead")));  // GPIO pin for SDA line (legacy name)
     };
     union {
         int pin_sccb_scl;  // GPIO pin for SCL line
-        int pin_sscb_scl __attribute__((
-            deprecated("please use pin_sccb_scl instead")));  // GPIO pin for SCL line (legacy name)
+        int pin_sscb_scl
+            __attribute__((deprecated("please use pin_sccb_scl instead")));  // GPIO pin for SCL line (legacy name)
     };
     int pin_d7;     // GPIO pin for D7
     int pin_d6;     // GPIO pin for D6

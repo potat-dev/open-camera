@@ -20,27 +20,20 @@ static inline void* jpge_malloc(size_t nSize) {
     if (b) {
         return b;
     }
+
     // check if SPIRAM is enabled and allocate on SPIRAM if allocatable
-#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && \
-     (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
+#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
     return heap_caps_malloc(nSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 #else
     return NULL;
 #endif
 }
+
 static inline void jpge_free(void* p) { free(p); }
 
 // Various JPEG enums and tables
 
-enum {
-    M_SOF0 = 0xC0,
-    M_DHT  = 0xC4,
-    M_SOI  = 0xD8,
-    M_EOI  = 0xD9,
-    M_SOS  = 0xDA,
-    M_DQT  = 0xDB,
-    M_APP0 = 0xE0
-};
+enum { M_SOF0 = 0xC0, M_DHT = 0xC4, M_SOI = 0xD8, M_EOI = 0xD9, M_SOS = 0xDA, M_DQT = 0xDB, M_APP0 = 0xE0 };
 
 enum {
     DC_LUM_CODES      = 12,
@@ -51,21 +44,17 @@ enum {
     MAX_HUFF_CODESIZE = 32
 };
 
-static const uint8 s_zag[64] = {0,  1,  8,  16, 9,  2,  3,  10, 17, 24, 32, 25, 18, 11, 4,  5,
-                                12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6,  7,  14, 21, 28,
-                                35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51,
-                                58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63};
+static const uint8 s_zag[64] = {0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34,
+    27, 20, 13, 6, 7, 14, 21, 28, 35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45, 38,
+    31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63};
 
-static const int16 s_std_lum_quant[64] = {
-    16, 11, 12,  14,  12,  10, 16, 14,  13,  14,  18,  17,  16, 19,  24,  40,
-    26, 24, 22,  22,  24,  49, 35, 37,  29,  40,  58,  51,  61, 60,  57,  51,
-    56, 55, 64,  72,  92,  78, 64, 68,  87,  69,  55,  56,  80, 109, 81,  87,
+static const int16 s_std_lum_quant[64] = {16, 11, 12, 14, 12, 10, 16, 14, 13, 14, 18, 17, 16, 19, 24, 40, 26, 24, 22,
+    22, 24, 49, 35, 37, 29, 40, 58, 51, 61, 60, 57, 51, 56, 55, 64, 72, 92, 78, 64, 68, 87, 69, 55, 56, 80, 109, 81, 87,
     95, 98, 103, 104, 103, 62, 77, 113, 121, 112, 100, 120, 92, 101, 103, 99};
 
-static const int16 s_std_croma_quant[64] = {
-    17, 18, 18, 24, 21, 24, 47, 26, 26, 47, 99, 66, 56, 66, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99};
+static const int16 s_std_croma_quant[64] = {17, 18, 18, 24, 21, 24, 47, 26, 26, 47, 99, 66, 56, 66, 99, 99, 99, 99, 99,
+    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+    99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99};
 
 static const uint8 s_dc_lum_bits[17] = {0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
 
@@ -73,18 +62,15 @@ static const uint8 s_dc_lum_val[DC_LUM_CODES] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1
 
 static const uint8 s_ac_lum_bits[17] = {0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d};
 
-static const uint8 s_ac_lum_val[AC_LUM_CODES] = {
-    0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61,
-    0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xa1, 0x08, 0x23, 0x42, 0xb1, 0xc1, 0x15, 0x52,
-    0xd1, 0xf0, 0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0a, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x25,
-    0x26, 0x27, 0x28, 0x29, 0x2a, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44, 0x45,
-    0x46, 0x47, 0x48, 0x49, 0x4a, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x63, 0x64,
-    0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x83,
-    0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99,
-    0x9a, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6,
-    0xb7, 0xb8, 0xb9, 0xba, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xd2, 0xd3,
-    0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8,
-    0xe9, 0xea, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa};
+static const uint8 s_ac_lum_val[AC_LUM_CODES] = {0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06,
+    0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xa1, 0x08, 0x23, 0x42, 0xb1, 0xc1, 0x15, 0x52, 0xd1,
+    0xf0, 0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0a, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a,
+    0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x53, 0x54, 0x55, 0x56,
+    0x57, 0x58, 0x59, 0x5a, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79,
+    0x7a, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0xa2,
+    0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xc2, 0xc3,
+    0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xe1, 0xe2, 0xe3,
+    0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa};
 
 static const uint8 s_dc_chroma_bits[17] = {0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0};
 
@@ -92,21 +78,18 @@ static const uint8 s_dc_chroma_val[DC_CHROMA_CODES] = {0, 1, 2, 3, 4, 5, 6, 7, 8
 
 static const uint8 s_ac_chroma_bits[17] = {0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77};
 
-static const uint8 s_ac_chroma_val[AC_CHROMA_CODES] = {
-    0x00, 0x01, 0x02, 0x03, 0x11, 0x04, 0x05, 0x21, 0x31, 0x06, 0x12, 0x41, 0x51, 0x07, 0x61,
-    0x71, 0x13, 0x22, 0x32, 0x81, 0x08, 0x14, 0x42, 0x91, 0xa1, 0xb1, 0xc1, 0x09, 0x23, 0x33,
-    0x52, 0xf0, 0x15, 0x62, 0x72, 0xd1, 0x0a, 0x16, 0x24, 0x34, 0xe1, 0x25, 0xf1, 0x17, 0x18,
-    0x19, 0x1a, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44,
-    0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x63,
-    0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a,
-    0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
-    0x98, 0x99, 0x9a, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4,
-    0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca,
-    0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7,
-    0xe8, 0xe9, 0xea, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa};
+static const uint8 s_ac_chroma_val[AC_CHROMA_CODES] = {0x00, 0x01, 0x02, 0x03, 0x11, 0x04, 0x05, 0x21, 0x31, 0x06, 0x12,
+    0x41, 0x51, 0x07, 0x61, 0x71, 0x13, 0x22, 0x32, 0x81, 0x08, 0x14, 0x42, 0x91, 0xa1, 0xb1, 0xc1, 0x09, 0x23, 0x33,
+    0x52, 0xf0, 0x15, 0x62, 0x72, 0xd1, 0x0a, 0x16, 0x24, 0x34, 0xe1, 0x25, 0xf1, 0x17, 0x18, 0x19, 0x1a, 0x26, 0x27,
+    0x28, 0x29, 0x2a, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x53, 0x54,
+    0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x73, 0x74, 0x75, 0x76, 0x77,
+    0x78, 0x79, 0x7a, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98,
+    0x99, 0x9a, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9,
+    0xba, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda,
+    0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa};
 
-const int YR = 19595, YG = 38470, YB = 7471, CB_R = -11059, CB_G = -21709, CB_B = 32768,
-          CR_R = 32768, CR_G = -27439, CR_B = -5329;
+const int YR = 19595, YG = 38470, YB = 7471, CB_R = -11059, CB_G = -21709, CB_B = 32768, CR_R = 32768, CR_G = -27439,
+          CR_B = -5329;
 
 static int32 m_last_quality = 0;
 static int32 m_quantization_tables[2][64];
@@ -157,39 +140,38 @@ enum { CONST_BITS = 13, ROW_BITS = 2 };
 
 #define DCT_MUL(var, c) (static_cast<int16>(var) * static_cast<int32>(c))
 
-#define DCT1D(s0, s1, s2, s3, s4, s5, s6, s7)                                                 \
-    int32 t0 = s0 + s7, t7 = s0 - s7, t1 = s1 + s6, t6 = s1 - s6, t2 = s2 + s5, t5 = s2 - s5, \
-          t3 = s3 + s4, t4 = s3 - s4;                                                         \
-    int32 t10 = t0 + t3, t13 = t0 - t3, t11 = t1 + t2, t12 = t1 - t2;                         \
-    int32 u1 = DCT_MUL(t12 + t13, 4433);                                                      \
-    s2       = u1 + DCT_MUL(t13, 6270);                                                       \
-    s6       = u1 + DCT_MUL(t12, -15137);                                                     \
-    u1       = t4 + t7;                                                                       \
-    int32 u2 = t5 + t6, u3 = t4 + t6, u4 = t5 + t7;                                           \
-    int32 z5  = DCT_MUL(u3 + u4, 9633);                                                       \
-    t4        = DCT_MUL(t4, 2446);                                                            \
-    t5        = DCT_MUL(t5, 16819);                                                           \
-    t6        = DCT_MUL(t6, 25172);                                                           \
-    t7        = DCT_MUL(t7, 12299);                                                           \
-    u1        = DCT_MUL(u1, -7373);                                                           \
-    u2        = DCT_MUL(u2, -20995);                                                          \
-    u3        = DCT_MUL(u3, -16069);                                                          \
-    u4        = DCT_MUL(u4, -3196);                                                           \
-    u3       += z5;                                                                           \
-    u4       += z5;                                                                           \
-    s0        = t10 + t11;                                                                    \
-    s1        = t7 + u1 + u4;                                                                 \
-    s3        = t6 + u2 + u3;                                                                 \
-    s4        = t10 - t11;                                                                    \
-    s5        = t5 + u2 + u4;                                                                 \
+#define DCT1D(s0, s1, s2, s3, s4, s5, s6, s7)                                                               \
+    int32 t0 = s0 + s7, t7 = s0 - s7, t1 = s1 + s6, t6 = s1 - s6, t2 = s2 + s5, t5 = s2 - s5, t3 = s3 + s4, \
+          t4  = s3 - s4;                                                                                    \
+    int32 t10 = t0 + t3, t13 = t0 - t3, t11 = t1 + t2, t12 = t1 - t2;                                       \
+    int32 u1 = DCT_MUL(t12 + t13, 4433);                                                                    \
+    s2       = u1 + DCT_MUL(t13, 6270);                                                                     \
+    s6       = u1 + DCT_MUL(t12, -15137);                                                                   \
+    u1       = t4 + t7;                                                                                     \
+    int32 u2 = t5 + t6, u3 = t4 + t6, u4 = t5 + t7;                                                         \
+    int32 z5  = DCT_MUL(u3 + u4, 9633);                                                                     \
+    t4        = DCT_MUL(t4, 2446);                                                                          \
+    t5        = DCT_MUL(t5, 16819);                                                                         \
+    t6        = DCT_MUL(t6, 25172);                                                                         \
+    t7        = DCT_MUL(t7, 12299);                                                                         \
+    u1        = DCT_MUL(u1, -7373);                                                                         \
+    u2        = DCT_MUL(u2, -20995);                                                                        \
+    u3        = DCT_MUL(u3, -16069);                                                                        \
+    u4        = DCT_MUL(u4, -3196);                                                                         \
+    u3       += z5;                                                                                         \
+    u4       += z5;                                                                                         \
+    s0        = t10 + t11;                                                                                  \
+    s1        = t7 + u1 + u4;                                                                               \
+    s3        = t6 + u2 + u3;                                                                               \
+    s4        = t10 - t11;                                                                                  \
+    s5        = t5 + u2 + u4;                                                                               \
     s7        = t4 + u1 + u3;
 
 static void DCT2D(int32* p) {
     int32 c, *q = p;
 
     for (c = 7; c >= 0; c--, q += 8) {
-        int32 s0 = q[0], s1 = q[1], s2 = q[2], s3 = q[3], s4 = q[4], s5 = q[5], s6 = q[6],
-              s7 = q[7];
+        int32 s0 = q[0], s1 = q[1], s2 = q[2], s3 = q[3], s4 = q[4], s5 = q[5], s6 = q[6], s7 = q[7];
 
         DCT1D(s0, s1, s2, s3, s4, s5, s6, s7);
 
@@ -204,8 +186,8 @@ static void DCT2D(int32* p) {
     }
 
     for (q = p, c = 7; c >= 0; c--, q++) {
-        int32 s0 = q[0 * 8], s1 = q[1 * 8], s2 = q[2 * 8], s3 = q[3 * 8], s4 = q[4 * 8],
-              s5 = q[5 * 8], s6 = q[6 * 8], s7 = q[7 * 8];
+        int32 s0 = q[0 * 8], s1 = q[1 * 8], s2 = q[2 * 8], s3 = q[3 * 8], s4 = q[4 * 8], s5 = q[5 * 8], s6 = q[6 * 8],
+              s7 = q[7 * 8];
 
         DCT1D(s0, s1, s2, s3, s4, s5, s6, s7);
 
@@ -260,8 +242,7 @@ static void compute_huffman_table(uint* codes, uint8* code_sizes, uint8* bits, u
 void jpeg_encoder::flush_output_buffer() {
     if (m_out_buf_left != JPGE_OUT_BUF_SIZE) {
         m_all_stream_writes_succeeded =
-            m_all_stream_writes_succeeded &&
-            m_pStream->put_buf(m_out_buf, JPGE_OUT_BUF_SIZE - m_out_buf_left);
+            m_all_stream_writes_succeeded && m_pStream->put_buf(m_out_buf, JPGE_OUT_BUF_SIZE - m_out_buf_left);
     }
     m_pOut_buf     = m_out_buf;
     m_out_buf_left = JPGE_OUT_BUF_SIZE;
@@ -605,8 +586,7 @@ void jpeg_encoder::load_mcu(const void* pSrc) {
 
     // Possibly duplicate pixels at end of scanline if not a multiple of 8 or 16
     if (m_num_components == 1)
-        memset(m_mcu_lines[m_mcu_y_ofs] + m_image_bpl_xlt, pDst[m_image_bpl_xlt - 1],
-               m_image_x_mcu - m_image_x);
+        memset(m_mcu_lines[m_mcu_y_ofs] + m_image_bpl_xlt, pDst[m_image_bpl_xlt - 1], m_image_x_mcu - m_image_x);
     else {
         const uint8 y = pDst[m_image_bpl_xlt - 3 + 0], cb = pDst[m_image_bpl_xlt - 3 + 1],
                     cr = pDst[m_image_bpl_xlt - 3 + 2];
@@ -717,14 +697,14 @@ bool jpeg_encoder::jpg_open(int p_x_res, int p_y_res, int src_channels) {
         memcpy(m_huff_bits[2 + 1], s_ac_chroma_bits, 17);
         memcpy(m_huff_val[2 + 1], s_ac_chroma_val, AC_CHROMA_CODES);
 
-        compute_huffman_table(&m_huff_codes[0 + 0][0], &m_huff_code_sizes[0 + 0][0],
-                              m_huff_bits[0 + 0], m_huff_val[0 + 0]);
-        compute_huffman_table(&m_huff_codes[2 + 0][0], &m_huff_code_sizes[2 + 0][0],
-                              m_huff_bits[2 + 0], m_huff_val[2 + 0]);
-        compute_huffman_table(&m_huff_codes[0 + 1][0], &m_huff_code_sizes[0 + 1][0],
-                              m_huff_bits[0 + 1], m_huff_val[0 + 1]);
-        compute_huffman_table(&m_huff_codes[2 + 1][0], &m_huff_code_sizes[2 + 1][0],
-                              m_huff_bits[2 + 1], m_huff_val[2 + 1]);
+        compute_huffman_table(
+            &m_huff_codes[0 + 0][0], &m_huff_code_sizes[0 + 0][0], m_huff_bits[0 + 0], m_huff_val[0 + 0]);
+        compute_huffman_table(
+            &m_huff_codes[2 + 0][0], &m_huff_code_sizes[2 + 0][0], m_huff_bits[2 + 0], m_huff_val[2 + 0]);
+        compute_huffman_table(
+            &m_huff_codes[0 + 1][0], &m_huff_code_sizes[0 + 1][0], m_huff_bits[0 + 1], m_huff_val[0 + 1]);
+        compute_huffman_table(
+            &m_huff_codes[2 + 1][0], &m_huff_code_sizes[2 + 1][0], m_huff_bits[2 + 1], m_huff_val[2 + 1]);
     }
 
     m_out_buf_left = JPGE_OUT_BUF_SIZE;
@@ -774,12 +754,10 @@ jpeg_encoder::jpeg_encoder() { clear(); }
 
 jpeg_encoder::~jpeg_encoder() { deinit(); }
 
-bool jpeg_encoder::init(output_stream* pStream, int width, int height, int src_channels,
-                        const params& comp_params) {
+bool jpeg_encoder::init(output_stream* pStream, int width, int height, int src_channels, const params& comp_params) {
     deinit();
     if (((!pStream) || (width < 1) || (height < 1)) ||
-        ((src_channels != 1) && (src_channels != 3) && (src_channels != 4)) ||
-        (!comp_params.check()))
+        ((src_channels != 1) && (src_channels != 3) && (src_channels != 4)) || (!comp_params.check()))
         return false;
     m_pStream = pStream;
     m_params  = comp_params;

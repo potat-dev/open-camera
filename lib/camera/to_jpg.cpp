@@ -28,15 +28,14 @@ static void* _malloc(size_t size) {
     }
 
     // check if SPIRAM is enabled and is allocatable
-#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && \
-     (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
+#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 #endif
     return NULL;
 }
 
-static IRAM_ATTR void convert_line_format(uint8_t* src, pixformat_t format, uint8_t* dst,
-                                          size_t width, size_t in_channels, size_t line) {
+static IRAM_ATTR void convert_line_format(
+    uint8_t* src, pixformat_t format, uint8_t* dst, size_t width, size_t in_channels, size_t line) {
     int i = 0, o = 0, l = 0;
     if (format == PIXFORMAT_GRAYSCALE) {
         memcpy(dst, src + line * width, width);
@@ -86,8 +85,8 @@ static IRAM_ATTR void convert_line_format(uint8_t* src, pixformat_t format, uint
     }
 }
 
-bool convert_image(uint8_t* src, uint16_t width, uint16_t height, pixformat_t format,
-                   uint8_t quality, jpge::output_stream* dst_stream) {
+bool convert_image(uint8_t* src, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+    jpge::output_stream* dst_stream) {
     int                 num_channels = 3;
     jpge::subsampling_t subsampling  = default_subsampling;
 
@@ -153,8 +152,8 @@ class callback_stream : public jpge::output_stream {
     virtual size_t get_size() const { return index; }
 };
 
-bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
-                uint8_t quality, jpg_out_cb cb, void* arg) {
+bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+    jpg_out_cb cb, void* arg) {
     callback_stream dst_stream(cb, arg);
     return convert_image(src, width, height, format, quality, &dst_stream);
 }
@@ -169,8 +168,7 @@ class memory_stream : public jpge::output_stream {
     size_t   max_len, index;
 
    public:
-    memory_stream(void* pBuf, size_t buf_size)
-        : out_buf(static_cast<uint8_t*>(pBuf)), max_len(buf_size), index(0) {}
+    memory_stream(void* pBuf, size_t buf_size) : out_buf(static_cast<uint8_t*>(pBuf)), max_len(buf_size), index(0) {}
 
     virtual ~memory_stream() {}
 
@@ -194,8 +192,8 @@ class memory_stream : public jpge::output_stream {
     virtual size_t get_size() const { return index; }
 };
 
-bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
-             uint8_t quality, uint8_t** out, size_t* out_len) {
+bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+    uint8_t** out, size_t* out_len) {
     // todo: allocate proper buffer for holding JPEG data
     // this should be enough for CIF frame size
     int jpg_buf_len = 128 * 1024;
@@ -221,8 +219,6 @@ bool frame2jpg(camera_fb_t* fb, uint8_t quality, uint8_t** out, size_t* out_len)
     return fmt2jpg(fb->buf, fb->len, fb->width, fb->height, fb->format, quality, out, out_len);
 }
 
-void jpgSetChroma(chroma_t chroma) {
-    default_subsampling = static_cast<jpge::subsampling_t>(chroma);
-}
+void jpgSetChroma(chroma_t chroma) { default_subsampling = static_cast<jpge::subsampling_t>(chroma); }
 
 void jpgSetRgb565BE(bool enable) { rgb565_big_endian = enable; }

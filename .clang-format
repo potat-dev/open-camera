@@ -3,12 +3,15 @@ BasedOnStyle: Google
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
-ColumnLimit: 100
+ColumnLimit: 120
 SortIncludes: CaseSensitive
 IncludeBlocks: Preserve
 PointerAlignment: Left
 DerivePointerAlignment: false
 IndentPPDirectives: BeforeHash
+AlignAfterOpenBracket: DontAlign
+AllowShortLoopsOnASingleLine: true
+# AllowShortBlocksOnASingleLine: Always
 AlignConsecutiveMacros: true
 AlignConsecutiveDeclarations: true
 AlignConsecutiveAssignments:

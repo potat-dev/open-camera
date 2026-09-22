@@ -36,39 +36,23 @@ static const char* TAG = "cam_s3";
 
 void cam_s3_dma_print_state(cam_obj_t* cam) {
     esp_rom_printf("dma_infifo_status[%u]  :\n", cam->dma_num);
-    esp_rom_printf("  infifo_full_l1       : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l1);
-    esp_rom_printf("  infifo_empty_l1      : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l1);
-    esp_rom_printf("  infifo_full_l2       : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l2);
-    esp_rom_printf("  infifo_empty_l2      : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l2);
-    esp_rom_printf("  infifo_full_l3       : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l3);
-    esp_rom_printf("  infifo_empty_l3      : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l3);
-    esp_rom_printf("  infifo_cnt_l1        : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l1);
-    esp_rom_printf("  infifo_cnt_l2        : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l2);
-    esp_rom_printf("  infifo_cnt_l3        : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l3);
-    esp_rom_printf("  in_remain_under_1b_l3: %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_1b_l3);
-    esp_rom_printf("  in_remain_under_2b_l3: %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_2b_l3);
-    esp_rom_printf("  in_remain_under_3b_l3: %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_3b_l3);
-    esp_rom_printf("  in_remain_under_4b_l3: %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_4b_l3);
-    esp_rom_printf("  in_buf_hungry        : %lu\n",
-                   GDMA.channel[cam->dma_num].in.infifo_status.in_buf_hungry);
+    esp_rom_printf("  infifo_full_l1       : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l1);
+    esp_rom_printf("  infifo_empty_l1      : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l1);
+    esp_rom_printf("  infifo_full_l2       : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l2);
+    esp_rom_printf("  infifo_empty_l2      : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l2);
+    esp_rom_printf("  infifo_full_l3       : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l3);
+    esp_rom_printf("  infifo_empty_l3      : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l3);
+    esp_rom_printf("  infifo_cnt_l1        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l1);
+    esp_rom_printf("  infifo_cnt_l2        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l2);
+    esp_rom_printf("  infifo_cnt_l3        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l3);
+    esp_rom_printf("  in_remain_under_1b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_1b_l3);
+    esp_rom_printf("  in_remain_under_2b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_2b_l3);
+    esp_rom_printf("  in_remain_under_3b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_3b_l3);
+    esp_rom_printf("  in_remain_under_4b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_4b_l3);
+    esp_rom_printf("  in_buf_hungry        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_buf_hungry);
     esp_rom_printf("dma_state[%u]          :\n", cam->dma_num);
-    esp_rom_printf("  dscr_addr            : 0x%lx\n",
-                   GDMA.channel[cam->dma_num].in.state.dscr_addr);
-    esp_rom_printf("  in_dscr_state        : %lu\n",
-                   GDMA.channel[cam->dma_num].in.state.in_dscr_state);
+    esp_rom_printf("  dscr_addr            : 0x%lx\n", GDMA.channel[cam->dma_num].in.state.dscr_addr);
+    esp_rom_printf("  in_dscr_state        : %lu\n", GDMA.channel[cam->dma_num].in.state.in_dscr_state);
     esp_rom_printf("  in_state             : %lu\n", GDMA.channel[cam->dma_num].in.state.in_state);
 }
 
@@ -169,8 +153,7 @@ bool cam_s3_start(cam_obj_t* cam, int frame_pos) {
     if (!cam->psram_mode) {
         GDMA.channel[cam->dma_num].in.link.addr = ((uint32_t)&cam->dma[0]) & 0xfffff;
     } else {
-        GDMA.channel[cam->dma_num].in.link.addr =
-            ((uint32_t)&cam->frames[frame_pos].dma[0]) & 0xfffff;
+        GDMA.channel[cam->dma_num].in.link.addr = ((uint32_t)&cam->frames[frame_pos].dma[0]) & 0xfffff;
     }
 
     GDMA.channel[cam->dma_num].in.link.start = 1;
@@ -248,7 +231,7 @@ static esp_err_t cam_s3_dma_init(cam_obj_t* cam) {
 
 #if ESP_IDF_VERSION_MAJOR > 5
     if (!(DPORT_REG_GET_BIT(SYSTEM_PERIP_RST_EN1_REG, SYSTEM_DMA_RST) == 0 &&
-          DPORT_REG_GET_BIT(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_DMA_CLK_EN) != 0)) {
+            DPORT_REG_GET_BIT(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_DMA_CLK_EN) != 0)) {
         DPORT_CLEAR_PERI_REG_MASK(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_DMA_CLK_EN);
         DPORT_SET_PERI_REG_MASK(SYSTEM_PERIP_RST_EN1_REG, SYSTEM_DMA_RST);
         DPORT_SET_PERI_REG_MASK(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_DMA_CLK_EN);
@@ -349,8 +332,14 @@ esp_err_t cam_s3_set_pin(cam_obj_t* cam, const camera_config_t* config) {
     gpio_matrix_in(config->pin_href, CAM_H_ENABLE_IDX, false);
 
     int data_pins[8] = {
-        config->pin_d0, config->pin_d1, config->pin_d2, config->pin_d3,
-        config->pin_d4, config->pin_d5, config->pin_d6, config->pin_d7,
+        config->pin_d0,
+        config->pin_d1,
+        config->pin_d2,
+        config->pin_d3,
+        config->pin_d4,
+        config->pin_d5,
+        config->pin_d6,
+        config->pin_d7,
     };
 
     for (int i = 0; i < 8; i++) {
@@ -380,17 +369,16 @@ esp_err_t cam_s3_init_isr(cam_obj_t* cam) {
         gdma_periph_signals.groups[0].pairs[cam->dma_num].rx_irq_id,
 #endif
         ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_SHARED | CAMERA_ISR_IRAM_FLAG,
-        (uint32_t)&GDMA.channel[cam->dma_num].in.int_st, GDMA_IN_SUC_EOF_CH0_INT_ST_M,
-        cam_s3_dma_isr, cam, &cam->dma_intr_handle);
+        (uint32_t)&GDMA.channel[cam->dma_num].in.int_st, GDMA_IN_SUC_EOF_CH0_INT_ST_M, cam_s3_dma_isr, cam,
+        &cam->dma_intr_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "DMA interrupt allocation of camera failed");
         return ret;
     }
 
-    ret = esp_intr_alloc_intrstatus(
-        ETS_LCD_CAM_INTR_SOURCE, ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_SHARED | CAMERA_ISR_IRAM_FLAG,
-        (uint32_t)&LCD_CAM.lc_dma_int_st.val, LCD_CAM_CAM_VSYNC_INT_ST_M, cam_s3_vsync_isr, cam,
-        &cam->cam_intr_handle);
+    ret = esp_intr_alloc_intrstatus(ETS_LCD_CAM_INTR_SOURCE,
+        ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_SHARED | CAMERA_ISR_IRAM_FLAG, (uint32_t)&LCD_CAM.lc_dma_int_st.val,
+        LCD_CAM_CAM_VSYNC_INT_ST_M, cam_s3_vsync_isr, cam, &cam->cam_intr_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "LCD_CAM interrupt allocation of camera failed");
         return ret;
@@ -405,9 +393,7 @@ void cam_s3_do_vsync(cam_obj_t* cam) {
     gpio_matrix_in(cam->vsync_pin, CAM_V_SYNC_IDX, cam->vsync_invert);
 }
 
-uint8_t cam_s3_get_dma_align(cam_obj_t* cam) {
-    return 16 << GDMA.channel[cam->dma_num].in.conf1.in_ext_mem_bk_size;
-}
+uint8_t cam_s3_get_dma_align(cam_obj_t* cam) { return 16 << GDMA.channel[cam->dma_num].in.conf1.in_ext_mem_bk_size; }
 
 static bool cam_s3_calc_rgb_dma(cam_obj_t* cam) {
     size_t node_max       = LCD_CAM_DMA_NODE_BUFFER_MAX_SIZE / cam->dma_bytes_per_item;
@@ -442,8 +428,7 @@ static bool cam_s3_calc_rgb_dma(cam_obj_t* cam) {
     }
 
     ESP_LOGI(TAG, "node_size: %4u, nodes_per_line: %u, lines_per_node: %u",
-             (unsigned)(node_size * cam->dma_bytes_per_item), (unsigned)nodes_per_line,
-             (unsigned)lines_per_node);
+        (unsigned)(node_size * cam->dma_bytes_per_item), (unsigned)nodes_per_line, (unsigned)lines_per_node);
 
     cam->dma_node_buffer_size = node_size * cam->dma_bytes_per_item;
 
@@ -477,11 +462,11 @@ static bool cam_s3_calc_rgb_dma(cam_obj_t* cam) {
     }
 
     ESP_LOGI(TAG,
-             "dma_half_buffer_min: %5u, dma_half_buffer: %5u, lines_per_half_buffer: %2u, "
-             "dma_buffer_size: %5u",
-             (unsigned)(dma_half_buffer_min * cam->dma_bytes_per_item),
-             (unsigned)(dma_half_buffer * cam->dma_bytes_per_item), (unsigned)lines_per_half_buffer,
-             (unsigned)(dma_buffer_size * cam->dma_bytes_per_item));
+        "dma_half_buffer_min: %5u, dma_half_buffer: %5u, lines_per_half_buffer: %2u, "
+        "dma_buffer_size: %5u",
+        (unsigned)(dma_half_buffer_min * cam->dma_bytes_per_item),
+        (unsigned)(dma_half_buffer * cam->dma_bytes_per_item), (unsigned)lines_per_half_buffer,
+        (unsigned)(dma_buffer_size * cam->dma_bytes_per_item));
 
     cam->dma_buffer_size      = dma_buffer_size * cam->dma_bytes_per_item;
     cam->dma_half_buffer_size = dma_half_buffer * cam->dma_bytes_per_item;
@@ -529,8 +514,7 @@ size_t IRAM_ATTR cam_s3_memcpy(cam_obj_t* cam, uint8_t* out, const uint8_t* in, 
     return len;
 }
 
-esp_err_t cam_s3_set_sample_mode(cam_obj_t* cam, pixformat_t pix_format, uint32_t xclk_freq_hz,
-                                 uint16_t sensor_pid) {
+esp_err_t cam_s3_set_sample_mode(cam_obj_t* cam, pixformat_t pix_format, uint32_t xclk_freq_hz, uint16_t sensor_pid) {
     if (pix_format == PIXFORMAT_GRAYSCALE) {
         cam->in_bytes_per_pixel = 2;  // OV2640 outputs 2 bytes/pixel in YUV mode
         cam->fb_bytes_per_pixel = 1;

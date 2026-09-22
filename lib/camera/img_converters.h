@@ -27,8 +27,8 @@ typedef size_t (*jpg_out_cb)(void* arg, size_t index, const void* data, size_t l
  *
  * @return true on success
  */
-bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
-                uint8_t quality, jpg_out_cb cb, void* arg);
+bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+    jpg_out_cb cb, void* arg);
 
 /**
  * @brief Convert camera frame buffer to JPEG
@@ -57,8 +57,8 @@ bool frame2jpg_cb(camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg);
  *
  * @return true on success
  */
-bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
-             uint8_t quality, uint8_t** out, size_t* out_len);
+bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+    uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert camera frame buffer to JPEG buffer
@@ -85,8 +85,8 @@ bool frame2jpg(camera_fb_t* fb, uint8_t quality, uint8_t** out, size_t* out_len)
  *
  * @return true on success
  */
-bool fmt2bmp(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
-             uint8_t** out, size_t* out_len);
+bool fmt2bmp(
+    uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert camera frame buffer to BMP buffer

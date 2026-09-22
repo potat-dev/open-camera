@@ -52,8 +52,7 @@ static int write_reg(sensor_t* sensor, ov2640_bank_t bank, uint8_t reg, uint8_t 
     return ret;
 }
 
-static int set_reg_bits(sensor_t* sensor, uint8_t bank, uint8_t reg, uint8_t offset, uint8_t mask,
-                        uint8_t value) {
+static int set_reg_bits(sensor_t* sensor, uint8_t bank, uint8_t reg, uint8_t offset, uint8_t mask, uint8_t value) {
     int     ret = 0;
     uint8_t c_value, new_value;
 
@@ -74,8 +73,7 @@ static int read_reg(sensor_t* sensor, ov2640_bank_t bank, uint8_t reg) {
     return SCCB_Read(sensor->slv_addr, reg);
 }
 
-static uint8_t get_reg_bits(sensor_t* sensor, uint8_t bank, uint8_t reg, uint8_t offset,
-                            uint8_t mask) {
+static uint8_t get_reg_bits(sensor_t* sensor, uint8_t bank, uint8_t reg, uint8_t offset, uint8_t mask) {
     return (read_reg(sensor, (ov2640_bank_t)bank, reg) >> offset) & mask;
 }
 
@@ -133,8 +131,8 @@ static int set_pixformat(sensor_t* sensor, pixformat_t pixformat) {
     return ret;
 }
 
-static int set_window(sensor_t* sensor, ov2640_sensor_mode_t mode, int offset_x, int offset_y,
-                      int max_x, int max_y, int w, int h) {
+static int set_window(
+    sensor_t* sensor, ov2640_sensor_mode_t mode, int offset_x, int offset_y, int max_x, int max_y, int w, int h) {
     int ret = 0;
     const uint8_t (*regs)[2];
     ov2640_clk_t c;
@@ -145,18 +143,12 @@ static int set_window(sensor_t* sensor, ov2640_sensor_mode_t mode, int offset_x,
     w     /= 4;
     h     /= 4;
 
-    uint8_t win_regs[][2] = {{BANK_SEL, BANK_DSP},
-                             {HSIZE, (uint8_t)(max_x & 0xFF)},
-                             {VSIZE, (uint8_t)(max_y & 0xFF)},
-                             {XOFFL, (uint8_t)(offset_x & 0xFF)},
-                             {YOFFL, (uint8_t)(offset_y & 0xFF)},
-                             {VHYX, (uint8_t)(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) |
-                                              ((max_x >> 5) & 0X08) | ((offset_x >> 8) & 0X07))},
-                             {TEST, (uint8_t)((max_x >> 2) & 0X80)},
-                             {ZMOW, (uint8_t)((w) & 0xFF)},
-                             {ZMOH, (uint8_t)((h) & 0xFF)},
-                             {ZMHH, (uint8_t)(((h >> 6) & 0x04) | ((w >> 8) & 0x03))},
-                             {0, 0}};
+    uint8_t win_regs[][2] = {{BANK_SEL, BANK_DSP}, {HSIZE, (uint8_t)(max_x & 0xFF)}, {VSIZE, (uint8_t)(max_y & 0xFF)},
+        {XOFFL, (uint8_t)(offset_x & 0xFF)}, {YOFFL, (uint8_t)(offset_y & 0xFF)},
+        {VHYX, (uint8_t)(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) |
+                         ((offset_x >> 8) & 0X07))},
+        {TEST, (uint8_t)((max_x >> 2) & 0X80)}, {ZMOW, (uint8_t)((w) & 0xFF)}, {ZMOH, (uint8_t)((h) & 0xFF)},
+        {ZMHH, (uint8_t)(((h >> 6) & 0x04) | ((w >> 8) & 0x03))}, {0, 0}};
 
     if (sensor->pixformat == PIXFORMAT_JPEG) {
         c.clk_2x    = 0;
@@ -182,8 +174,8 @@ static int set_window(sensor_t* sensor, ov2640_sensor_mode_t mode, int offset_x,
             c.pclk_div = 12;
         }
     }
-    ESP_LOGI(TAG, "Set PLL: clk_2x: %u, clk_div: %u, pclk_auto: %u, pclk_div: %u", c.clk_2x,
-             c.clk_div, c.pclk_auto, c.pclk_div);
+    ESP_LOGI(TAG, "Set PLL: clk_2x: %u, clk_div: %u, pclk_auto: %u, pclk_div: %u", c.clk_2x, c.clk_div, c.pclk_auto,
+        c.pclk_div);
 
     if (mode == OV2640_MODE_CIF) {
         regs = ov2640_settings_to_cif;
@@ -386,7 +378,7 @@ static int set_hmirror_sensor(sensor_t* sensor, int enable) {
 static int set_vflip_sensor(sensor_t* sensor, int enable) {
     int ret              = 0;
     sensor->status.vflip = enable;
-    ret = write_reg_bits(sensor, BANK_SENSOR, REG04, REG04_VREF_EN, enable ? 1 : 0);
+    ret                  = write_reg_bits(sensor, BANK_SENSOR, REG04, REG04_VREF_EN, enable ? 1 : 0);
     return ret & write_reg_bits(sensor, BANK_SENSOR, REG04, REG04_VFLIP_IMG, enable ? 1 : 0);
 }
 
@@ -449,15 +441,13 @@ static int set_reg(sensor_t* sensor, int reg, int mask, int value) {
     return ret;
 }
 
-static int set_res_raw(sensor_t* sensor, int startX, int startY, int endX, int endY, int offsetX,
-                       int offsetY, int totalX, int totalY, int outputX, int outputY, bool scale,
-                       bool binning) {
-    return set_window(sensor, (ov2640_sensor_mode_t)startX, offsetX, offsetY, totalX, totalY,
-                      outputX, outputY);
+static int set_res_raw(sensor_t* sensor, int startX, int startY, int endX, int endY, int offsetX, int offsetY,
+    int totalX, int totalY, int outputX, int outputY, bool scale, bool binning) {
+    return set_window(sensor, (ov2640_sensor_mode_t)startX, offsetX, offsetY, totalX, totalY, outputX, outputY);
 }
 
-static int _set_pll(sensor_t* sensor, int bypass, int multiplier, int sys_div, int root_2x,
-                    int pre_div, int seld5, int pclk_manual, int pclk_div) {
+static int _set_pll(sensor_t* sensor, int bypass, int multiplier, int sys_div, int root_2x, int pre_div, int seld5,
+    int pclk_manual, int pclk_div) {
     return -1;
 }
 
@@ -484,10 +474,10 @@ static int init_status(sensor_t* sensor) {
         }
     }
 
-    sensor->status.aec_value = ((uint16_t)get_reg_bits(sensor, BANK_SENSOR, REG45, 0, 0x3F) << 10) |
-                               ((uint16_t)read_reg(sensor, BANK_SENSOR, AEC) << 2) |
-                               get_reg_bits(sensor, BANK_SENSOR, REG04, 0, 3);  // 0 - 1200
-    sensor->status.quality   = read_reg(sensor, BANK_DSP, QS);
+    sensor->status.aec_value   = ((uint16_t)get_reg_bits(sensor, BANK_SENSOR, REG45, 0, 0x3F) << 10) |
+                                 ((uint16_t)read_reg(sensor, BANK_SENSOR, AEC) << 2) |
+                                 get_reg_bits(sensor, BANK_SENSOR, REG04, 0, 3);  // 0 - 1200
+    sensor->status.quality     = read_reg(sensor, BANK_DSP, QS);
     sensor->status.gainceiling = get_reg_bits(sensor, BANK_SENSOR, COM9, 5, 7);
 
     sensor->status.awb      = get_reg_bits(sensor, BANK_DSP, CTRL1, 3, 1);

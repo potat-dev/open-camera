@@ -40,16 +40,14 @@ typedef struct {
 
 static void* _malloc(size_t size) {
     // check if SPIRAM is enabled and allocate on SPIRAM if allocatable
-#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && \
-     (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
+#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 #endif
     // try allocating in internal memory
     return malloc(size);
 }
 
-static bool jpg2rgb888(const uint8_t* src, size_t src_len, uint8_t* out,
-                       esp_jpeg_image_scale_t scale) {
+static bool jpg2rgb888(const uint8_t* src, size_t src_len, uint8_t* out, esp_jpeg_image_scale_t scale) {
     esp_jpeg_image_cfg_t jpeg_cfg = {
         .indata      = (uint8_t*)src,
         .indata_size = src_len,
@@ -213,8 +211,8 @@ bool fmt2rgb888(const uint8_t* src_buf, size_t src_len, pixformat_t format, uint
     return true;
 }
 
-bool fmt2bmp(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
-             uint8_t** out, size_t* out_len) {
+bool fmt2bmp(
+    uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t** out, size_t* out_len) {
     if (format == PIXFORMAT_JPEG) {
         return jpg2bmp(src, src_len, out, out_len);
     }
