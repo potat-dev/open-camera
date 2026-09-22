@@ -1,12 +1,8 @@
-// from driver/private_include/cam_hal.h
-// Internal HAL interface
-
 #pragma once
 
 #include "camera.h"
-#include "portmacro.h"
+#include "freertos/FreeRTOS.h"
 #include "sensor.h"
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,19 +30,19 @@ esp_err_t cam_hal_deinit(void);
  *     - ESP_ERR_NO_MEM No memory to initialize lcd_cam
  *     - ESP_FAIL Initialize fail
  */
-esp_err_t cam_hal_init(const camera_config_t *config);
+esp_err_t cam_hal_init(const camera_config_t* config);
 
 esp_err_t cam_reconfigure_raw(framesize_t new_size);
 
-esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint16_t sensor_pid);
+esp_err_t cam_config(const camera_config_t* config, framesize_t frame_size, uint16_t sensor_pid);
 
 void cam_stop(void);
 
 void cam_start(void);
 
-camera_fb_t *cam_take(TickType_t timeout);
+camera_fb_t* cam_take(TickType_t timeout);
 
-void cam_give(camera_fb_t *dma_buffer);
+void cam_give(camera_fb_t* dma_buffer);
 
 void cam_give_all(void);
 

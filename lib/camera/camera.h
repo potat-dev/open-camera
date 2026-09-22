@@ -6,9 +6,7 @@
 #include "sensor.h"
 #include "sys/time.h"
 
-/**
- * @brief define for if chip supports camera
- */
+// chip supports camera
 #define cam_SUPPORTED \
     (CONFIG_IDF_TARGET_ESP32 | CONFIG_IDF_TARGET_ESP32S3 | CONFIG_IDF_TARGET_ESP32S2)
 
@@ -16,9 +14,6 @@
 extern "C" {
 #endif
 
-/**
- * @brief Configuration structure for camera initialization
- */
 typedef enum {
     // fills buffers when they are empty. Less resources but first 'fb_count' frames might be old
     CAMERA_GRAB_WHEN_EMPTY,
@@ -26,44 +21,38 @@ typedef enum {
     CAMERA_GRAB_LATEST
 } camera_grab_mode_t;
 
-/**
- * @brief Camera frame buffer location
- */
 typedef enum {
     CAMERA_FB_IN_PSRAM,  // Frame buffer is placed in external PSRAM
     CAMERA_FB_IN_DRAM    // Frame buffer is placed in internal DRAM
 } camera_fb_location_t;
 
-/**
- * @brief Configuration structure for camera initialization
- */
 typedef struct {
-    int pin_pwdn;   // GPIO pin for camera power down line
-    int pin_reset;  // GPIO pin for camera reset line
-    int pin_xclk;   // GPIO pin for camera XCLK line
+    int pin_pwdn;   // GPIO pin for power down line
+    int pin_reset;  // GPIO pin for reset line
+    int pin_xclk;   // GPIO pin for XCLK line
     union {
-        int pin_sccb_sda;  // GPIO pin for camera SDA line
-        int pin_sscb_sda __attribute__((deprecated(
-            "please use pin_sccb_sda instead")));  // GPIO pin for camera SDA line (legacy name)
+        int pin_sccb_sda;  // GPIO pin for SDA line
+        int pin_sscb_sda __attribute__((
+            deprecated("please use pin_sccb_sda instead")));  // GPIO pin for SDA line (legacy name)
     };
     union {
-        int pin_sccb_scl;  // GPIO pin for camera SCL line
-        int pin_sscb_scl __attribute__((deprecated(
-            "please use pin_sccb_scl instead")));  // GPIO pin for camera SCL line (legacy name)
+        int pin_sccb_scl;  // GPIO pin for SCL line
+        int pin_sscb_scl __attribute__((
+            deprecated("please use pin_sccb_scl instead")));  // GPIO pin for SCL line (legacy name)
     };
-    int pin_d7;     // GPIO pin for camera D7 line
-    int pin_d6;     // GPIO pin for camera D6 line
-    int pin_d5;     // GPIO pin for camera D5 line
-    int pin_d4;     // GPIO pin for camera D4 line
-    int pin_d3;     // GPIO pin for camera D3 line
-    int pin_d2;     // GPIO pin for camera D2 line
-    int pin_d1;     // GPIO pin for camera D1 line
-    int pin_d0;     // GPIO pin for camera D0 line
-    int pin_vsync;  // GPIO pin for camera VSYNC line
-    int pin_href;   // GPIO pin for camera HREF line
-    int pin_pclk;   // GPIO pin for camera PCLK line
+    int pin_d7;     // GPIO pin for D7
+    int pin_d6;     // GPIO pin for D6
+    int pin_d5;     // GPIO pin for D5
+    int pin_d4;     // GPIO pin for D4
+    int pin_d3;     // GPIO pin for D3
+    int pin_d2;     // GPIO pin for D2
+    int pin_d1;     // GPIO pin for D1
+    int pin_d0;     // GPIO pin for D0
+    int pin_vsync;  // GPIO pin for VSYNC
+    int pin_href;   // GPIO pin for HREF
+    int pin_pclk;   // GPIO pin for PCLK
 
-    int xclk_freq_hz;  // Frequency of XCLK signal, in Hz
+    int xclk_freq_hz;  // Frequency of XCLK signal
 
     ledc_timer_t   ledc_timer;    // LEDC timer to be used for generating XCLK
     ledc_channel_t ledc_channel;  // LEDC channel to be used for generating XCLK
@@ -78,20 +67,22 @@ typedef struct {
     // frame_size
     framesize_t max_frame_size;
 
-    int    jpeg_quality;  // Quality of JPEG output. 0-63 lower means higher quality
-    size_t fb_count;  // Number of frame buffers to be allocated. If more than one, then each frame
-                      // will be acquired (double speed)
+    // Quality of JPEG output. 0-63 lower means higher quality
+    int jpeg_quality;
+
+    // Number of frame buffers to be allocated. If more than one, then each frame
+    // will be acquired (double speed)
+    size_t fb_count;
+
     camera_fb_location_t fb_location;  // The location where the frame buffer will be allocated
     camera_grab_mode_t   grab_mode;    // When buffers should be filled
 
-    int    sccb_i2c_port;     // If pin_sccb_sda is -1, use the already configured I2C bus by number
-    size_t jpeg_buffer_size;  // Size of the JPEG frame buffer in bytes. Set to 0 to use the default
-                              // size
+    int sccb_i2c_port;  // If pin_sccb_sda is -1, use the already configured I2C bus by number
+
+    // Size of the JPEG frame buffer in bytes. Set to 0 to use the default size
+    size_t jpeg_buffer_size;
 } camera_config_t;
 
-/**
- * @brief Data structure of camera frame buffer
- */
 typedef struct {
     uint8_t*       buf;        // Pointer to the pixel data
     size_t         len;        // Length of the buffer in bytes

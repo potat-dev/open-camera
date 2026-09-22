@@ -1,6 +1,3 @@
-// from driver/cam_hal.c
-// FreeRTOS task, DMA queue, buffer manager
-
 #include <stdio.h>
 #include <string.h>
 #include <stdalign.h>
