@@ -9,7 +9,7 @@ enum MenuItemType : uint8_t {
 };
 
 struct MenuItem {
-    const char* name;
+    const char*  name;
     MenuItemType type;
 
     // Current value. Meaning depends on type:
@@ -19,13 +19,13 @@ struct MenuItem {
     int value = 0;
 
     // MENU_SELECT only
-    const char* const* options = nullptr;
-    uint8_t optionCount = 0;
+    const char* const* options     = nullptr;
+    uint8_t            optionCount = 0;
 
     // MENU_INTEGER only
     int minValue = 0;
     int maxValue = 0;
-    int step = 1;
+    int step     = 1;
 };
 
 class Menu {
@@ -48,18 +48,18 @@ class Menu {
 
     void backHandler() {
         _exitRequested = true;
-        _editing = false;
-        _focus = 0;
+        _editing       = false;
+        _focus         = 0;
     }
 
     bool wantsExit() {
-        bool r = _exitRequested;
+        bool r         = _exitRequested;
         _exitRequested = false;
         return r;
     }
 
     bool changed() {
-        bool e = _changed;
+        bool e   = _changed;
         _changed = false;
         return e;
     }
@@ -69,7 +69,7 @@ class Menu {
         int w = canvas.width() - offset * 2;
 
         canvas.setTextSize(textSize);
-        int rowHeight = canvas.fontHeight() + canvas.fontHeight() / 4;
+        int rowHeight   = canvas.fontHeight() + canvas.fontHeight() / 4;
         int visibleRows = h / rowHeight;
 
         int scroll = 0;
@@ -82,7 +82,7 @@ class Menu {
             int i = scroll + row;
             if (i >= (int)_count) break;
 
-            int rowY = offset + row * rowHeight;
+            int  rowY    = offset + row * rowHeight;
             bool focused = (i == _focus);
 
             if (focused) {
@@ -105,12 +105,11 @@ class Menu {
 
    private:
     MenuItem** _items;
-    uint8_t _count;
-    uint8_t _focus = 0;
-    bool _editing = false;
-    int _editBackup = 0;
-    bool _exitRequested = false;
-    bool _changed = false;
+    uint8_t    _count;
+    uint8_t    _focus         = 0;
+    bool       _editing       = false;
+    bool       _exitRequested = false;
+    bool       _changed       = false;
 
     void moveFocus(int dir) {
         if (_count == 0) return;
@@ -124,7 +123,7 @@ class Menu {
         MenuItem* it = _items[_focus];
         if (it->type == MENU_SELECT && it->optionCount > 0) {
             it->value = (it->value + dir + it->optionCount) % it->optionCount;
-            _changed = true;
+            _changed  = true;
         } else if (it->type == MENU_INTEGER) {
             it->value += dir * it->step;
             if (it->value < it->minValue) it->value = it->maxValue;
@@ -132,7 +131,7 @@ class Menu {
             _changed = true;
         } else if (it->type == MENU_TOGGLE && dir) {
             it->value = !it->value;
-            _changed = true;
+            _changed  = true;
         }
     }
 

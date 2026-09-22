@@ -91,17 +91,6 @@ LGFX_Sprite  canvas(&display);
 
 // camera
 
-struct cam_mode_t {
-    framesize_t framesize;
-    pixformat_t pixformat;  // RGB565 or YUV422, never JPEG
-    size_t      fb_count;
-
-    bool operator==(const cam_mode_t&) const = default;
-};
-
-// static cam_mode_t MODE_VIEWFINDER = {FRAMESIZE_QVGA, PIXFORMAT_RGB565, 2};
-// static cam_mode_t MODE_CAPTURE    = {FRAMESIZE_UXGA, PIXFORMAT_RGB565, 1};
-
 static camera_config_t build_camera_config() {
     camera_config_t config = {};
 
@@ -273,12 +262,6 @@ void capture() {
 
     ESP_LOGI("capture", "Reading dummy frame");
 
-    // discard dummy frame
-    // TODO: propably can be safely removed now (needs validation)
-    // UPD: removing this dummy read operation resulted in strange glitches:
-    // top of the frame (roughly 1/8 height) has normal exposure & WB
-    // everything below is over-exposured
-    // and sometimes whole image just has glitched (rainbow) colors
     camera_fb_t* dummy = cam_fb_get();
     if (dummy) cam_fb_return(dummy);
 

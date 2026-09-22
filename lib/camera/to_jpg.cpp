@@ -1,88 +1,77 @@
-// Copyright 2015-2016 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 #include <stddef.h>
 #include <string.h>
-#include "esp_attr.h"
-#include "soc/efuse_reg.h"
-#include "esp_heap_caps.h"
+
 #include "camera.h"
+#include "esp_attr.h"
+#include "esp_heap_caps.h"
 #include "img_converters.h"
 #include "jpge.h"
+#include "soc/efuse_reg.h"
 #include "yuv.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
-#include "esp32-hal-log.h"
+    #include "esp32-hal-log.h"
 #else
-#include "esp_log.h"
+    #include "esp_log.h"
 #endif
 
 static const char* TAG = "to_jpg";
 
 static jpge::subsampling_t default_subsampling = jpge::H2V2;
+
 static bool rgb565_big_endian = true;
 
-static void *_malloc(size_t size)
-{
-    void * res = malloc(size);
-    if(res) {
+static void* _malloc(size_t size) {
+    void* res = malloc(size);
+    if (res) {
         return res;
     }
 
     // check if SPIRAM is enabled and is allocatable
-#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
+#if ((CONFIG_SPIRAM || CONFIG_SPIRAM_SUPPORT) && \
+     (CONFIG_SPIRAM_USE_CAPS_ALLOC || CONFIG_SPIRAM_USE_MALLOC))
     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 #endif
     return NULL;
 }
 
-static IRAM_ATTR void convert_line_format(uint8_t * src, pixformat_t format, uint8_t * dst, size_t width, size_t in_channels, size_t line)
-{
-    int i=0, o=0, l=0;
-    if(format == PIXFORMAT_GRAYSCALE) {
+static IRAM_ATTR void convert_line_format(uint8_t* src, pixformat_t format, uint8_t* dst,
+                                          size_t width, size_t in_channels, size_t line) {
+    int i = 0, o = 0, l = 0;
+    if (format == PIXFORMAT_GRAYSCALE) {
         memcpy(dst, src + line * width, width);
-    } else if(format == PIXFORMAT_RGB888) {
-        l = width * 3;
+    } else if (format == PIXFORMAT_RGB888) {
+        l    = width * 3;
         src += l * line;
-        for(i=0; i<l; i+=3) {
-            dst[o++] = src[i+2];
-            dst[o++] = src[i+1];
+        for (i = 0; i < l; i += 3) {
+            dst[o++] = src[i + 2];
+            dst[o++] = src[i + 1];
             dst[o++] = src[i];
         }
-    } else if(format == PIXFORMAT_RGB565) {
-        l = width * 2;
+    } else if (format == PIXFORMAT_RGB565) {
+        l    = width * 2;
         src += l * line;
-        for(i=0; i<l; i+=2) {
+        for (i = 0; i < l; i += 2) {
             if (rgb565_big_endian) {
                 dst[o++] = src[i] & 0xF8;
-                dst[o++] = (src[i] & 0x07) << 5 | (src[i+1] & 0xE0) >> 3;
-                dst[o++] = (src[i+1] & 0x1F) << 3;
-            } else  {
-                dst[o++] = src[i+1] & 0xF8;
-                dst[o++] = (src[i+1] & 0x07) << 5 | (src[i] & 0xE0) >> 3;
+                dst[o++] = (src[i] & 0x07) << 5 | (src[i + 1] & 0xE0) >> 3;
+                dst[o++] = (src[i + 1] & 0x1F) << 3;
+            } else {
+                dst[o++] = src[i + 1] & 0xF8;
+                dst[o++] = (src[i + 1] & 0x07) << 5 | (src[i] & 0xE0) >> 3;
                 dst[o++] = (src[i] & 0x1F) << 3;
             }
         }
-    } else if(format == PIXFORMAT_YUV422) {
+    } else if (format == PIXFORMAT_YUV422) {
         uint8_t y0, y1, u, v;
         uint8_t r, g, b;
-        l = width * 2;
+        l    = width * 2;
         src += l * line;
-        for(i=0; i<l; i+=4) {
+        for (i = 0; i < l; i += 4) {
             y0 = src[i];
-            u = src[i+1];
-            y1 = src[i+2];
-            v = src[i+3];
+            u  = src[i + 1];
+            y1 = src[i + 2];
+            v  = src[i + 3];
 
             yuv2rgb(y0, u, v, &r, &g, &b);
             dst[o++] = r;
@@ -97,25 +86,25 @@ static IRAM_ATTR void convert_line_format(uint8_t * src, pixformat_t format, uin
     }
 }
 
-bool convert_image(uint8_t *src, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality, jpge::output_stream *dst_stream)
-{
-    int num_channels = 3;
-    jpge::subsampling_t subsampling = default_subsampling;
+bool convert_image(uint8_t* src, uint16_t width, uint16_t height, pixformat_t format,
+                   uint8_t quality, jpge::output_stream* dst_stream) {
+    int                 num_channels = 3;
+    jpge::subsampling_t subsampling  = default_subsampling;
 
-    if(format == PIXFORMAT_GRAYSCALE) {
+    if (format == PIXFORMAT_GRAYSCALE) {
         num_channels = 1;
-        subsampling = jpge::Y_ONLY;
+        subsampling  = jpge::Y_ONLY;
     }
 
-    if(!quality) {
+    if (!quality) {
         quality = 1;
-    } else if(quality > 100) {
+    } else if (quality > 100) {
         quality = 100;
     }
 
-    jpge::params comp_params = jpge::params();
+    jpge::params comp_params  = jpge::params();
     comp_params.m_subsampling = subsampling;
-    comp_params.m_quality = quality;
+    comp_params.m_quality     = quality;
 
     jpge::jpeg_encoder dst_image;
 
@@ -125,7 +114,7 @@ bool convert_image(uint8_t *src, uint16_t width, uint16_t height, pixformat_t fo
     }
 
     uint8_t* line = (uint8_t*)_malloc(width * num_channels);
-    if(!line) {
+    if (!line) {
         ESP_LOGE(TAG, "Scan line malloc failed");
         return false;
     }
@@ -149,56 +138,50 @@ bool convert_image(uint8_t *src, uint16_t width, uint16_t height, pixformat_t fo
 }
 
 class callback_stream : public jpge::output_stream {
-protected:
+   protected:
     jpg_out_cb ocb;
-    void * oarg;
-    size_t index;
+    void*      oarg;
+    size_t     index;
 
-public:
-    callback_stream(jpg_out_cb cb, void * arg) : ocb(cb), oarg(arg), index(0) { }
-    virtual ~callback_stream() { }
-    virtual bool put_buf(const void* data, int len)
-    {
+   public:
+    callback_stream(jpg_out_cb cb, void* arg) : ocb(cb), oarg(arg), index(0) {}
+    virtual ~callback_stream() {}
+    virtual bool put_buf(const void* data, int len) {
         index += ocb(oarg, index, data, len);
         return true;
     }
-    virtual size_t get_size() const
-    {
-        return index;
-    }
+    virtual size_t get_size() const { return index; }
 };
 
-bool fmt2jpg_cb(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality, jpg_out_cb cb, void * arg)
-{
+bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
+                uint8_t quality, jpg_out_cb cb, void* arg) {
     callback_stream dst_stream(cb, arg);
     return convert_image(src, width, height, format, quality, &dst_stream);
 }
 
-bool frame2jpg_cb(camera_fb_t * fb, uint8_t quality, jpg_out_cb cb, void * arg)
-{
+bool frame2jpg_cb(camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg) {
     return fmt2jpg_cb(fb->buf, fb->len, fb->width, fb->height, fb->format, quality, cb, arg);
 }
 
-
-
 class memory_stream : public jpge::output_stream {
-protected:
-    uint8_t *out_buf;
-    size_t max_len, index;
+   protected:
+    uint8_t* out_buf;
+    size_t   max_len, index;
 
-public:
-    memory_stream(void *pBuf, size_t buf_size) : out_buf(static_cast<uint8_t*>(pBuf)), max_len(buf_size), index(0) { }
+   public:
+    memory_stream(void* pBuf, size_t buf_size)
+        : out_buf(static_cast<uint8_t*>(pBuf)), max_len(buf_size), index(0) {}
 
-    virtual ~memory_stream() { }
+    virtual ~memory_stream() {}
 
-    virtual bool put_buf(const void* pBuf, int len)
-    {
+    virtual bool put_buf(const void* pBuf, int len) {
         if (!pBuf) {
-            //end of image
+            // end of image
             return true;
         }
         if ((size_t)len > (max_len - index)) {
-            //ESP_LOGW(TAG, "JPG output overflow: %d bytes (%d,%d,%d)", len - (max_len - index), len, index, max_len);
+            // ESP_LOGW(TAG, "JPG output overflow: %d bytes (%d,%d,%d)", len - (max_len - index),
+            // len, index, max_len);
             len = max_len - index;
         }
         if (len) {
@@ -208,47 +191,38 @@ public:
         return true;
     }
 
-    virtual size_t get_size() const
-    {
-        return index;
-    }
+    virtual size_t get_size() const { return index; }
 };
 
-bool fmt2jpg(uint8_t *src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality, uint8_t ** out, size_t * out_len)
-{
-    //todo: allocate proper buffer for holding JPEG data
-    //this should be enough for CIF frame size
-    int jpg_buf_len = 128*1024;
+bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
+             uint8_t quality, uint8_t** out, size_t* out_len) {
+    // todo: allocate proper buffer for holding JPEG data
+    // this should be enough for CIF frame size
+    int jpg_buf_len = 128 * 1024;
 
-
-    uint8_t * jpg_buf = (uint8_t *)_malloc(jpg_buf_len);
-    if(jpg_buf == NULL) {
+    uint8_t* jpg_buf = (uint8_t*)_malloc(jpg_buf_len);
+    if (jpg_buf == NULL) {
         ESP_LOGE(TAG, "JPG buffer malloc failed");
         return false;
     }
     memory_stream dst_stream(jpg_buf, jpg_buf_len);
 
-    if(!convert_image(src, width, height, format, quality, &dst_stream)) {
+    if (!convert_image(src, width, height, format, quality, &dst_stream)) {
         free(jpg_buf);
         return false;
     }
 
-    *out = jpg_buf;
+    *out     = jpg_buf;
     *out_len = dst_stream.get_size();
     return true;
 }
 
-bool frame2jpg(camera_fb_t * fb, uint8_t quality, uint8_t ** out, size_t * out_len)
-{
+bool frame2jpg(camera_fb_t* fb, uint8_t quality, uint8_t** out, size_t* out_len) {
     return fmt2jpg(fb->buf, fb->len, fb->width, fb->height, fb->format, quality, out, out_len);
 }
 
-void jpgSetChroma(chroma_t chroma)
-{
+void jpgSetChroma(chroma_t chroma) {
     default_subsampling = static_cast<jpge::subsampling_t>(chroma);
 }
 
-void jpgSetRgb565BE(bool enable)
-{
-    rgb565_big_endian = enable;
-}
+void jpgSetRgb565BE(bool enable) { rgb565_big_endian = enable; }
