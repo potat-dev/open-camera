@@ -215,19 +215,23 @@ static int cam_verify_jpeg_eoi(const uint8_t *inbuf, uint32_t length, bool searc
     return -1;
 }
 
-static bool cam_get_next_frame(int * frame_pos)
+static bool cam_get_next_frame(int *frame_pos)
 {
-    if(!cam_obj->frames[*frame_pos].en){
+    // If current slot is busy or too small for current resolution, find another
+    if (!cam_obj->frames[*frame_pos].en || 
+        cam_obj->recv_size > cam_obj->frames[*frame_pos].max_size) {
+        
         for (int x = 0; x < cam_obj->frame_cnt; x++) {
-            if (cam_obj->frames[x].en) {
+            // Only select if buffer is free AND has enough memory
+            if (cam_obj->frames[x].en && 
+                cam_obj->recv_size <= cam_obj->frames[x].max_size) {
                 *frame_pos = x;
                 return true;
             }
         }
-    } else {
-        return true;
+        return false;
     }
-    return false;
+    return true;
 }
 
 static bool cam_start_frame(int* frame_pos) {
@@ -291,8 +295,9 @@ static void cam_task(void *arg)
                 size_t pixels_per_dma = (cam_obj->dma_half_buffer_size * cam_obj->fb_bytes_per_pixel) / (cam_obj->dma_bytes_per_item * cam_obj->in_bytes_per_pixel);
 
                 if (cam_event == CAM_IN_SUC_EOF_EVENT) {
-                    if(!cam_obj->psram_mode){
-                        if (cam_obj->fb_size < (frame_buffer_event->len + pixels_per_dma)) {
+                    if (!cam_obj->psram_mode) {
+                        // Verify against the active slot's actual allocated capacity
+                        if (cam_obj->frames[frame_pos].max_size < (frame_buffer_event->len + pixels_per_dma)) {
                             ESP_CAMERA_ETS_PRINTF(DRAM_STR("cam_hal: FB-OVF\r\n"));
                             cam_s3_stop(cam_obj);
                             continue;
@@ -464,17 +469,9 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
     CAM_CHECK(cam_obj->frames != NULL, "frames malloc failed", ESP_FAIL);
 
     uint8_t dma_align = 0;
-    size_t fb_size = cam_obj->fb_size;
-    if (cam_obj->psram_mode) {
-        dma_align = cam_s3_get_dma_align(cam_obj);
-        if (cam_obj->fb_size < cam_obj->recv_size) {
-            fb_size = cam_obj->recv_size;
-        }
-        fb_size += cam_obj->dma_half_buffer_size;
-    }
+    size_t max_fb_size = cam_obj->fb_size; // Sized for max_frame_size (e.q. UXGA: 3.84 MB)
+    size_t min_fb_size = cam_obj->recv_size; // Sized for init frame_size (e.q. QVGA: 153.6 KB)
 
-    /* Allocate memory for PSRAM frame buffers (sized for max_framesize) */
-    size_t alloc_size = fb_size * sizeof(uint8_t) + dma_align;
     uint32_t _caps = MALLOC_CAP_8BIT;
     if (CAMERA_FB_IN_DRAM == config->fb_location) {
         _caps |= MALLOC_CAP_INTERNAL;
@@ -486,6 +483,16 @@ static esp_err_t cam_dma_config(const camera_config_t *config)
         cam_obj->frames[x].dma = NULL;
         cam_obj->frames[x].fb_offset = 0;
         cam_obj->frames[x].en = 0;
+
+        // Slot 0 gets full capture capacity; Slot 1+ gets preview capacity
+        size_t current_slot_capacity = (x == 0) ? max_fb_size : min_fb_size;
+        cam_obj->frames[x].max_size = current_slot_capacity;
+
+        size_t alloc_size = current_slot_capacity * sizeof(uint8_t) + dma_align;
+        ESP_LOGI(TAG, "Allocating Frame[%d] (%u KB) in %s", 
+                 x, (unsigned)(current_slot_capacity / 1024), 
+                 _caps & MALLOC_CAP_SPIRAM ? "PSRAM" : "SRAM");
+
         cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_aligned_alloc(16, alloc_size, _caps);
         CAM_CHECK(cam_obj->frames[x].fb.buf != NULL, "frame buffer malloc failed", ESP_FAIL);
         cam_obj->frames[x].en = 1;

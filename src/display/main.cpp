@@ -131,7 +131,7 @@ static camera_config_t build_camera_config() {
     config.frame_size     = SIZE_VIEWFINDER;
     config.max_frame_size = SIZE_CAPTURE;
 
-    config.fb_count     = 1;
+    config.fb_count     = 2;  // enable asymmetric double-buffering
     config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAMERA_PCLK_FREQ;
 

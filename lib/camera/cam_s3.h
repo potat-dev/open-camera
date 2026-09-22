@@ -81,6 +81,7 @@ typedef struct {
     //for RGB/YUV modes
     lldesc_t *dma;
     size_t fb_offset;
+    size_t max_size;
 } cam_frame_t;
 
 typedef struct {
