@@ -61,11 +61,13 @@ constexpr uint8_t     IMAGE_QUALITY    = 85;  // JPEG quality for conversion
 // data transfer rate
 constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets
 constexpr uint32_t DISPLAY_FREQ_READ  = 16_MHz;
-constexpr uint32_t CAMERA_PCLK_FREQ   = 20_MHz;
 constexpr uint32_t SD_CARD_SPI_FREQ   = 10_MHz;
+constexpr uint32_t CAMERA_PCLK_FREQ   = 24_MHz;  // 20 works stable, but I love pushing the limits
+// TODO: create fallback CAMERA_PCLK_FREQ to 20 MHz if init fails couple of times
 
 // SPI
 constexpr spi_host_device_t SPI_HOST = SPI2_HOST;
 
 // settings
-constexpr bool CAPTURE_THUMBS = true;
+constexpr bool CAPTURE_THUMBS_RAW = true;
+constexpr bool CAPTURE_THUMBS_JPG = true;

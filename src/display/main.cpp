@@ -273,7 +273,7 @@ bool captureThumb() {
         return false;
     }
 
-    char* filename = getFilename(nextPhotoIndex, "raw");
+    char* filename = getFilename(nextPhotoIndex, "thumb");
     File  file     = SD.open(filename, FILE_WRITE, true);  // TODO: reuse saveData
     if (!file) {
         Serial.println("Error: Failed to open file");
@@ -284,11 +284,9 @@ bool captureThumb() {
 
     ESP_LOGI("thumb", "File open, saving");
     ok = file.write(frame->buf, frame->len) == frame->len;
-    cam_fb_return(frame);
 
     file.flush();
     file.close();
-    unmountSD();
 
     if (!ok) {
         ESP_LOGE("thumb", "Save failed");
@@ -296,13 +294,45 @@ bool captureThumb() {
     }
 
     ESP_LOGI("thumb", "Save done");
+    if (!CAPTURE_THUMBS_JPG) {
+        cam_fb_return(frame);
+        unmountSD();
+        return true;
+    }
+
+    ESP_LOGI("thumb", "Opening file for JPEG variant");
+
+    // TODO: call some common saveJPEG() instead (see EOF below)
+    filename = getFilename(nextPhotoIndex, "thumb.jpg");
+    file     = SD.open(filename, FILE_WRITE, true);  // TODO: reuse saveData
+    if (!file) {
+        Serial.println("Error: Failed to open file");
+        cam_fb_return(frame);
+        unmountSD();
+        return false;
+    }
+
+    ESP_LOGI("thumb", "File open, converting and saving");
+    ok = frame2jpg_cb(frame, IMAGE_QUALITY, save_photo_chunk, &file);
+    cam_fb_return(frame);
+
+    file.flush();
+    file.close();
+    unmountSD();
+
+    if (!ok) {
+        ESP_LOGE("thumb", "JPEG compression and save failed");
+        return false;
+    }
+
+    ESP_LOGI("thumb", "JPEG compression and save done");
     return true;
 }
 
 void capture() {
     bool ok;
 
-    if (CAPTURE_THUMBS) {
+    if (CAPTURE_THUMBS_RAW) {
         ok = captureThumb();
         if (!ok) {
             Serial.println("Thumb capture failed");
@@ -593,3 +623,8 @@ void loop() {
             break;
     }
 }
+
+// TODO: refactor using:
+// saveImage() - converts FB to JPEG and saves
+// saveRawFrame() - just saves FB as plain pixformat bytes
+// both accepts FB and filename, open and close files automatically underneah
