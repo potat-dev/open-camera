@@ -54,11 +54,11 @@ static bool jpg2rgb888(const uint8_t* src, size_t src_len, uint8_t* out, esp_jpe
         .outbuf      = out,
         .outbuf_size = UINT32_MAX,  // @todo: this is very bold assumption, keeping this like this
                                     // for now, not to break existing code
-        .out_format                   = JPEG_IMAGE_FORMAT_RGB888,
-        .out_scale                    = scale,
-        .flags.swap_color_bytes       = 0,
-        .advanced.working_buffer      = work,
-        .advanced.working_buffer_size = sizeof(work),
+        .out_format = JPEG_IMAGE_FORMAT_RGB888,
+        .out_scale  = scale,
+        .flags      = {.swap_color_bytes = 0},
+        .advanced   = {.working_buffer = work, .working_buffer_size = sizeof(work)},
+        .priv       = {.read = 0},
     };
     esp_jpeg_image_output_t output_img = {};
 
@@ -75,11 +75,11 @@ bool jpg2rgb565(const uint8_t* src, size_t src_len, uint8_t* out, esp_jpeg_image
         .outbuf      = out,
         .outbuf_size = UINT32_MAX,  // @todo: this is very bold assumption, keeping this like this
                                     // for now, not to break existing code
-        .out_format                   = JPEG_IMAGE_FORMAT_RGB565,
-        .out_scale                    = scale,
-        .flags.swap_color_bytes       = 0,
-        .advanced.working_buffer      = work,
-        .advanced.working_buffer_size = sizeof(work),
+        .out_format = JPEG_IMAGE_FORMAT_RGB565,
+        .out_scale  = scale,
+        .flags      = {.swap_color_bytes = 0},
+        .advanced   = {.working_buffer = work, .working_buffer_size = sizeof(work)},
+        .priv       = {.read = 0},
     };
 
     esp_jpeg_image_output_t output_img = {};
@@ -95,13 +95,15 @@ bool jpg2bmp(const uint8_t* src, size_t src_len, uint8_t** out, size_t* out_len)
     bmp_header_t* bitmap;
 
     esp_jpeg_image_cfg_t jpeg_cfg = {
-        .indata                       = (uint8_t*)src,
-        .indata_size                  = src_len,
-        .out_format                   = JPEG_IMAGE_FORMAT_RGB888,
-        .out_scale                    = JPEG_IMAGE_SCALE_0,
-        .flags.swap_color_bytes       = 0,
-        .advanced.working_buffer      = work,
-        .advanced.working_buffer_size = sizeof(work),
+        .indata      = (uint8_t*)src,
+        .indata_size = src_len,
+        .outbuf      = NULL,
+        .outbuf_size = 0,
+        .out_format  = JPEG_IMAGE_FORMAT_RGB888,
+        .out_scale   = JPEG_IMAGE_SCALE_0,
+        .flags       = {.swap_color_bytes = 0},
+        .advanced    = {.working_buffer = work, .working_buffer_size = sizeof(work)},
+        .priv        = {.read = 0},
     };
 
     bool                    ret        = false;

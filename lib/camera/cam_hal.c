@@ -208,7 +208,7 @@ static int cam_verify_jpeg_eoi(const uint8_t* inbuf, uint32_t length, bool searc
 static bool cam_get_next_frame(int* frame_pos) {
     // If current slot is busy or too small for current resolution, find another
     if (!cam_obj->frames[*frame_pos].en || cam_obj->recv_size > cam_obj->frames[*frame_pos].max_size) {
-        for (int x = 0; x < cam_obj->frame_cnt; x++) {
+        for (uint32_t x = 0; x < cam_obj->frame_cnt; x++) {
             // Only select if buffer is free AND has enough memory
             if (cam_obj->frames[x].en && cam_obj->recv_size <= cam_obj->frames[x].max_size) {
                 *frame_pos = x;
@@ -250,7 +250,8 @@ void IRAM_ATTR cam_s3_send_event(cam_obj_t* cam, cam_event_t cam_event, BaseType
 
 // Copy frame from DMA dma_buffer to frame dma_buffer
 static void cam_task(void* arg) {
-    int cnt               = 0;
+    uint32_t cnt = 0;
+
     int frame_pos         = 0;
     cam_obj->state        = CAM_STATE_IDLE;
     cam_event_t cam_event = CAM_IN_SUC_EOF_EVENT;
@@ -419,7 +420,7 @@ static void cam_task(void* arg) {
 }
 
 static void relink_dma_descriptors(cam_obj_t* cam) {
-    for (int x = 0; x < cam->dma_node_cnt; x++) {
+    for (uint32_t x = 0; x < cam->dma_node_cnt; x++) {
         cam->dma[x].size   = cam->dma_node_buffer_size;
         cam->dma[x].length = 0;
         cam->dma[x].sosf   = 0;
@@ -460,7 +461,7 @@ static esp_err_t cam_dma_config(const camera_config_t* config) {
         _caps |= MALLOC_CAP_SPIRAM;
     }
 
-    for (int x = 0; x < cam_obj->frame_cnt; x++) {
+    for (uint32_t x = 0; x < cam_obj->frame_cnt; x++) {
         cam_obj->frames[x].dma       = NULL;
         cam_obj->frames[x].fb_offset = 0;
         cam_obj->frames[x].en        = 0;
@@ -545,7 +546,7 @@ esp_err_t cam_reconfigure_raw(framesize_t new_size) {
     cam_give_all();
     xQueueReset(cam_obj->event_queue);
     xQueueReset(cam_obj->frame_buffer_queue);
-    for (int x = 0; x < cam_obj->frame_cnt; x++) {
+    for (uint32_t x = 0; x < cam_obj->frame_cnt; x++) {
         cam_obj->frames[x].fb.len = 0;
     }
     cam_obj->state = CAM_STATE_IDLE;
@@ -689,7 +690,7 @@ esp_err_t cam_hal_deinit(void) {
         free(cam_obj->dma_buffer);
     }
     if (cam_obj->frames) {
-        for (int x = 0; x < cam_obj->frame_cnt; x++) {
+        for (uint32_t x = 0; x < cam_obj->frame_cnt; x++) {
             free(cam_obj->frames[x].fb.buf - cam_obj->frames[x].fb_offset);
             if (cam_obj->frames[x].dma) {
                 free(cam_obj->frames[x].dma);
@@ -807,7 +808,7 @@ camera_fb_t* cam_take(TickType_t timeout) {
 }
 
 void cam_give(camera_fb_t* dma_buffer) {
-    for (int x = 0; x < cam_obj->frame_cnt; x++) {
+    for (uint32_t x = 0; x < cam_obj->frame_cnt; x++) {
         if (&cam_obj->frames[x].fb == dma_buffer) {
             cam_obj->frames[x].en = 1;
             break;
@@ -816,7 +817,7 @@ void cam_give(camera_fb_t* dma_buffer) {
 }
 
 void cam_give_all(void) {
-    for (int x = 0; x < cam_obj->frame_cnt; x++) {
+    for (uint32_t x = 0; x < cam_obj->frame_cnt; x++) {
         cam_obj->frames[x].en = 1;
     }
 }
