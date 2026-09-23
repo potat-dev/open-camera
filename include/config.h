@@ -66,3 +66,6 @@ constexpr uint32_t SD_CARD_SPI_FREQ   = 10_MHz;
 
 // SPI
 constexpr spi_host_device_t SPI_HOST = SPI2_HOST;
+
+// settings
+constexpr bool CAPTURE_THUMBS = true;

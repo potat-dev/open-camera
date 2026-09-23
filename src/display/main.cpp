@@ -248,63 +248,114 @@ static size_t save_photo_chunk(void* arg, size_t index, const void* data, size_t
     return file->write(static_cast<const uint8_t*>(data), size);
 }
 
-void capture() {
+char* getFilename(const uint16_t index, const char* suffix = "jpg") {
+    static char name[32];
+    snprintf(name, sizeof(name), "/pic_%04d.%s", index, suffix);
+    return name;
+}
+
+bool captureThumb() {
     bool ok;
-    char path[32];
 
-    ESP_LOGI("capture", "Capture entered, waiting for DMA");
-
+    ESP_LOGI("thumb", "Capture entered, waiting for DMA");
     display.waitDMA();
 
-    ESP_LOGI("capture", "Preserving gains and changing mode");
-
-    cam_set_raw_framesize(SIZE_CAPTURE);
-
-    ESP_LOGI("capture", "Reading dummy frame");
-
-    camera_fb_t* dummy = cam_fb_get();
-    if (dummy) cam_fb_return(dummy);
-
-    ESP_LOGI("capture", "Capturing actual frame");
-
-    // capture actual frame
-    camera_fb_t* raw_data = cam_fb_get();
-    if (!raw_data) {
+    ESP_LOGI("thumb", "Capturing thumbnail frame");
+    camera_fb_t* frame = cam_fb_get();
+    if (!frame) {
         Serial.println("Capture failed");
-        return;
+        return false;
     }
 
-    ESP_LOGI("capture", "Capture done, opening file");
-
+    ESP_LOGI("thumb", "Capture done, opening file");
     ok = mountSD();
     if (!ok) {
         Serial.println("Error: Failed to mount SD card");
-        cam_fb_return(raw_data);
-        return;
+        cam_fb_return(frame);
+        return false;
     }
 
-    snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex++);
-
-    File file = SD.open(path, FILE_WRITE, true);
+    char* filename = getFilename(nextPhotoIndex, "raw");
+    File  file     = SD.open(filename, FILE_WRITE, true);  // TODO: reuse saveData
     if (!file) {
         Serial.println("Error: Failed to open file");
-        cam_fb_return(raw_data);
+        cam_fb_return(frame);
         unmountSD();
-        return;
+        return false;
     }
 
-    ESP_LOGI("capture", "File open, converting and saving");
-
-    // compress and stream to SD card
-    ok = frame2jpg_cb(raw_data, IMAGE_QUALITY, save_photo_chunk, &file);
-    cam_fb_return(raw_data);
+    ESP_LOGI("thumb", "File open, saving");
+    ok = file.write(frame->buf, frame->len) == frame->len;
+    cam_fb_return(frame);
 
     file.flush();
     file.close();
     unmountSD();
 
     if (!ok) {
-        Serial.println("JPEG compression and save failed");
+        ESP_LOGE("thumb", "Save failed");
+        return false;
+    }
+
+    ESP_LOGI("thumb", "Save done");
+    return true;
+}
+
+void capture() {
+    bool ok;
+
+    if (CAPTURE_THUMBS) {
+        ok = captureThumb();
+        if (!ok) {
+            Serial.println("Thumb capture failed");
+            return;
+        }
+    }
+
+    ESP_LOGI("capture", "Capture entered, waiting for DMA");
+    display.waitDMA();
+
+    ESP_LOGI("capture", "Preserving gains and changing mode");
+    cam_set_raw_framesize(SIZE_CAPTURE);
+
+    ESP_LOGI("capture", "Reading dummy frame");
+    camera_fb_t* dummy = cam_fb_get();
+    if (dummy) cam_fb_return(dummy);
+
+    ESP_LOGI("capture", "Capturing actual frame");
+    camera_fb_t* frame = cam_fb_get();
+    if (!frame) {
+        Serial.println("Capture failed");
+        return;
+    }
+
+    ESP_LOGI("capture", "Capture done, opening file");
+    ok = mountSD();
+    if (!ok) {
+        Serial.println("Error: Failed to mount SD card");
+        cam_fb_return(frame);
+        return;
+    }
+
+    char* filename = getFilename(nextPhotoIndex++);
+    File  file     = SD.open(filename, FILE_WRITE, true);
+    if (!file) {
+        Serial.println("Error: Failed to open file");
+        cam_fb_return(frame);
+        unmountSD();
+        return;
+    }
+
+    ESP_LOGI("capture", "File open, converting and saving");
+    ok = frame2jpg_cb(frame, IMAGE_QUALITY, save_photo_chunk, &file);
+    cam_fb_return(frame);
+
+    file.flush();
+    file.close();
+    unmountSD();
+
+    if (!ok) {
+        ESP_LOGE("capture", "JPEG compression and save failed");
         return;
     }
 
@@ -393,8 +444,6 @@ void transitionTo(State next) {
             break;
 
         case PICTURE:
-            drawFrame();
-            updateDisplay();
             capture();
             break;
 
