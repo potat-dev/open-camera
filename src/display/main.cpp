@@ -189,16 +189,20 @@ bool camera_init() {
 
 // SD card
 
+char* getFilename(const uint16_t index, const char* suffix = "jpg") {
+    static char name[32];
+    snprintf(name, sizeof(name), "/pic_%04d.%s", index, suffix);
+    return name;
+}
+
 void findNextPhotoIndex() {
-    char path[32];
+    char* name = NULL;
     while (nextPhotoIndex < 10000) {
-        snprintf(path, sizeof(path), "/pic_%04d.jpg", nextPhotoIndex);
-        if (!SD.exists(path)) {
-            break;
-        }
+        name = getFilename(nextPhotoIndex);
+        if (!SD.exists(name)) break;
         nextPhotoIndex++;
     }
-    Serial.printf("Next photo will be: /pic_%04d.jpg\n", nextPhotoIndex);
+    Serial.printf("Next photo will be: %s\n", name);
 }
 
 bool mountSD(uint8_t max_attempts = 3, uint32_t retry_delay = 150) {
@@ -246,12 +250,6 @@ bool saveData(const char* filename, const uint8_t* data, size_t size) {
 static size_t save_photo_chunk(void* arg, size_t index, const void* data, size_t size) {
     File* file = static_cast<File*>(arg);
     return file->write(static_cast<const uint8_t*>(data), size);
-}
-
-char* getFilename(const uint16_t index, const char* suffix = "jpg") {
-    static char name[32];
-    snprintf(name, sizeof(name), "/pic_%04d.%s", index, suffix);
-    return name;
 }
 
 bool captureThumb() {
@@ -444,6 +442,8 @@ void transitionTo(State next) {
             break;
 
         case PICTURE:
+            drawFrame();
+            updateDisplay();
             capture();
             break;
 
