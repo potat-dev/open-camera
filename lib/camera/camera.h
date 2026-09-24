@@ -6,9 +6,6 @@
 #include "sensor.h"
 #include "sys/time.h"
 
-// chip supports camera
-#define cam_SUPPORTED (CONFIG_IDF_TARGET_ESP32 | CONFIG_IDF_TARGET_ESP32S3 | CONFIG_IDF_TARGET_ESP32S2)
-
 #ifdef __cplusplus
 extern "C" {
 #endif

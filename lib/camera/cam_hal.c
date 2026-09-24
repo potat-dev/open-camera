@@ -19,13 +19,7 @@
     #ifndef ESP_CACHE_MSYNC_FLAG_DIR_M2C
         #define ESP_CACHE_MSYNC_FLAG_DIR_M2C 0
     #endif
-    #if CONFIG_IDF_TARGET_ESP32
-        #include "esp32/rom/ets_sys.h"  // will be removed in idf v5.0
-    #elif CONFIG_IDF_TARGET_ESP32S2
-        #include "esp32s2/rom/ets_sys.h"
-    #elif CONFIG_IDF_TARGET_ESP32S3
-        #include "esp32s3/rom/ets_sys.h"
-    #endif
+    #include "esp32s3/rom/ets_sys.h"
 #endif  // ESP_IDF_VERSION_MAJOR
 
 #if CONFIG_LOG_DEFAULT_LEVEL_NONE
@@ -260,11 +254,10 @@ static void cam_task(void* arg) {
 
     while (1) {
         xQueueReceive(cam_obj->event_queue, (void*)&cam_event, portMAX_DELAY);
-        DBG_PIN_SET(1);
+
         switch (cam_obj->state) {
             case CAM_STATE_IDLE: {
                 if (cam_event == CAM_VSYNC_EVENT) {
-                    // DBG_PIN_SET(1);
                     if (cam_start_frame(&frame_pos)) {
                         cam_obj->frames[frame_pos].fb.len = 0;
                         cam_obj->state                    = CAM_STATE_READ_BUF;
@@ -350,7 +343,6 @@ static void cam_task(void* arg) {
                     cnt++;
 
                 } else if (cam_event == CAM_VSYNC_EVENT) {
-                    // DBG_PIN_SET(1);
                     cam_s3_stop(cam_obj);
 
                     if (cnt || !cam_obj->jpeg_mode || cam_obj->psram_mode) {
@@ -415,7 +407,6 @@ static void cam_task(void* arg) {
                 }
             } break;
         }
-        DBG_PIN_SET(0);
     }
 }
 
@@ -570,12 +561,6 @@ esp_err_t cam_hal_init(const camera_config_t* config) {
     ret = cam_s3_config(cam_obj, config);
     CAM_CHECK_GOTO(ret == ESP_OK, "ll_cam initialize failed", err);
 
-#if CAMERA_DBG_PIN_ENABLE
-    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[DBG_PIN_NUM], PIN_FUNC_GPIO);
-    gpio_set_direction(DBG_PIN_NUM, GPIO_MODE_OUTPUT);
-    gpio_set_pull_mode(DBG_PIN_NUM, GPIO_FLOATING);
-#endif
-
     ESP_LOGI(TAG, "cam init ok");
     return ESP_OK;
 
@@ -596,12 +581,9 @@ esp_err_t cam_config(const camera_config_t* config, framesize_t frame_size, uint
     ret = cam_s3_set_sample_mode(cam_obj, (pixformat_t)config->pixel_format, config->xclk_freq_hz, sensor_pid);
     CAM_CHECK_GOTO(ret == ESP_OK, "cam_s3_set_sample_mode failed", err);
 
-    cam_obj->jpeg_mode = config->pixel_format == PIXFORMAT_JPEG;
-#if CONFIG_IDF_TARGET_ESP32S2 || CONFIG_IDF_TARGET_ESP32S3
+    cam_obj->jpeg_mode  = config->pixel_format == PIXFORMAT_JPEG;
     cam_obj->psram_mode = g_psram_dma_mode;
-#else
-    cam_obj->psram_mode = false;
-#endif
+
     ESP_LOGI(TAG, "PSRAM DMA mode %s", cam_obj->psram_mode ? "enabled" : "disabled");
     cam_obj->frame_cnt = config->fb_count;
     cam_obj->width     = resolution[frame_size].width;
@@ -712,15 +694,12 @@ void cam_stop(void) {
 void cam_start(void) { cam_s3_vsync_intr_enable(cam_obj, true); }
 
 camera_fb_t* cam_take(TickType_t timeout) {
-    camera_fb_t*     dma_buffer = NULL;
-    const TickType_t start      = xTaskGetTickCount();
-#if CONFIG_IDF_TARGET_ESP32S3
-    uint16_t             dma_reset_counter = 0;
-    static const uint8_t MAX_GDMA_RESETS   = 3;
-#else
-    // throttle repeated NULL frame warnings
-    static uint16_t warn_null_cnt = 0;
-#endif
+    camera_fb_t*     dma_buffer        = NULL;
+    const TickType_t start             = xTaskGetTickCount();
+    uint16_t         dma_reset_counter = 0;
+
+    static const uint8_t MAX_GDMA_RESETS = 3;
+
     // throttle repeated NO-EOI warnings
     static uint16_t warn_eoi_miss_cnt = 0;
 
@@ -739,7 +718,6 @@ camera_fb_t* cam_take(TickType_t timeout) {
         if (!dma_buffer) {
             // Work-around for ESP32-S3 GDMA freeze when Wi-Fi STA starts
             // See esp32-camera commit 984999f (issue #620)
-#if CONFIG_IDF_TARGET_ESP32S3
             if (dma_reset_counter < MAX_GDMA_RESETS) {
                 cam_s3_dma_reset(cam_obj);
                 dma_reset_counter++;
@@ -750,10 +728,7 @@ camera_fb_t* cam_take(TickType_t timeout) {
                     DRAM_STR("cam_hal: Giving up GDMA reset after %u tries\r\n"), (unsigned)dma_reset_counter);
                 dma_reset_counter++;  // suppress further logs
             }
-#else
-            // Early warning for misbehaving sensors on other chips
-            CAM_WARN_THROTTLE(warn_null_cnt, "Unexpected NULL frame on " CONFIG_IDF_TARGET);
-#endif
+
             vTaskDelay(1);  // immediate yield once resets are done
             continue;
         }

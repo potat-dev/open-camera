@@ -82,7 +82,6 @@ void cam_s3_dma_reset(cam_obj_t* cam) {
 }
 
 static void CAMERA_ISR_IRAM_ATTR cam_s3_vsync_isr(void* arg) {
-    // DBG_PIN_SET(1);
     cam_obj_t* cam          = (cam_obj_t*)arg;
     BaseType_t HPTaskAwoken = pdFALSE;
 
@@ -101,7 +100,6 @@ static void CAMERA_ISR_IRAM_ATTR cam_s3_vsync_isr(void* arg) {
     if (HPTaskAwoken == pdTRUE) {
         portYIELD_FROM_ISR();
     }
-    // DBG_PIN_SET(0);
 }
 
 static void CAMERA_ISR_IRAM_ATTR cam_s3_dma_isr(void* arg) {
@@ -255,13 +253,6 @@ esp_err_t cam_s3_config(cam_obj_t* cam, const camera_config_t* config) {
         periph_ll_disable_clk_set_rst(PERIPH_LCD_CAM_MODULE);
         periph_ll_enable_clk_clear_rst(PERIPH_LCD_CAM_MODULE);
     }
-
-    // if (REG_GET_BIT(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_LCD_CAM_CLK_EN) == 0) {
-    //     REG_CLR_BIT(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_LCD_CAM_CLK_EN);
-    //     REG_SET_BIT(SYSTEM_PERIP_CLK_EN1_REG, SYSTEM_LCD_CAM_CLK_EN);
-    //     REG_SET_BIT(SYSTEM_PERIP_RST_EN1_REG, SYSTEM_LCD_CAM_RST);
-    //     REG_CLR_BIT(SYSTEM_PERIP_RST_EN1_REG, SYSTEM_LCD_CAM_RST);
-    // }
 
     LCD_CAM.cam_ctrl.val = 0;
 

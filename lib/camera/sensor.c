@@ -23,18 +23,22 @@ const resolution_info_t resolution[FRAMESIZE_INVALID] = {
     {1280, 720, ASPECT_RATIO_16X9},  // HD
     {1280, 1024, ASPECT_RATIO_5X4},  // SXGA
     {1600, 1200, ASPECT_RATIO_4X3},  // UXGA
-    // 3MP Sensors
-    // {1920, 1080, ASPECT_RATIO_16X9},  // FHD
-    // {720, 1280, ASPECT_RATIO_9X16},   // Portrait HD
-    // {864, 1536, ASPECT_RATIO_9X16},   // Portrait 3MP
-    // {2048, 1536, ASPECT_RATIO_4X3},   // QXGA
-    // 5MP Sensors
-    // {2560, 1440, ASPECT_RATIO_16X9},   // QHD
-    // {2560, 1600, ASPECT_RATIO_16X10},  // WQXGA
-    // {1088, 1920, ASPECT_RATIO_9X16},   // Portrait FHD
-    // {2560, 1920, ASPECT_RATIO_4X3},    // QSXGA
-    // {2592, 1944, ASPECT_RATIO_4X3},    // 5MP
 };
+
+// More resolutions, just for reference:
+
+// 3MP Sensors
+// {1920, 1080, ASPECT_RATIO_16X9},  // FHD
+// {720, 1280, ASPECT_RATIO_9X16},   // Portrait HD
+// {864, 1536, ASPECT_RATIO_9X16},   // Portrait 3MP
+// {2048, 1536, ASPECT_RATIO_4X3},   // QXGA
+
+// 5MP Sensors
+// {2560, 1440, ASPECT_RATIO_16X9},   // QHD
+// {2560, 1600, ASPECT_RATIO_16X10},  // WQXGA
+// {1088, 1920, ASPECT_RATIO_9X16},   // Portrait FHD
+// {2560, 1920, ASPECT_RATIO_4X3},    // QSXGA
+// {2592, 1944, ASPECT_RATIO_4X3},    // 5MP
 
 camera_sensor_info_t* cam_sensor_get_info(sensor_id_t* id) {
     for (int i = 0; i < CAMERA_MODEL_MAX; i++) {

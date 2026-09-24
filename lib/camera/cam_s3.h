@@ -1,20 +1,10 @@
 #pragma once
 
 #include <stdint.h>
+
+#include "esp32s3/rom/lldesc.h"
 #include "esp_idf_version.h"
 #include "sdkconfig.h"
-
-#if CONFIG_IDF_TARGET_ESP32
-    #if ESP_IDF_VERSION_MAJOR >= 4
-        #include "esp32/rom/lldesc.h"
-    #else
-        #include "rom/lldesc.h"
-    #endif
-#elif CONFIG_IDF_TARGET_ESP32S2
-    #include "esp32s2/rom/lldesc.h"
-#elif CONFIG_IDF_TARGET_ESP32S3
-    #include "esp32s3/rom/lldesc.h"
-#endif
 
 #include "camera.h"
 #include "esp_log.h"
@@ -37,20 +27,6 @@
 #else
     #define CAMERA_ISR_IRAM_FLAG 0
     #define CAMERA_ISR_IRAM_ATTR
-#endif
-
-#define CAMERA_DBG_PIN_ENABLE 0
-
-#if CAMERA_DBG_PIN_ENABLE
-    #if CONFIG_IDF_TARGET_ESP32
-        #define DBG_PIN_NUM 26
-    #else
-        #define DBG_PIN_NUM 7
-    #endif
-    #include "hal/gpio_ll.h"
-    #define DBG_PIN_SET(v) gpio_ll_set_level(&GPIO, DBG_PIN_NUM, v)
-#else
-    #define DBG_PIN_SET(v)
 #endif
 
 #define CAM_CHECK(a, str, ret)                                    \
@@ -141,10 +117,8 @@ bool      cam_s3_dma_sizes(cam_obj_t* cam);
 size_t    cam_s3_memcpy(cam_obj_t* cam, uint8_t* out, const uint8_t* in, size_t len);
 esp_err_t cam_s3_set_sample_mode(cam_obj_t* cam, pixformat_t pix_format, uint32_t xclk_freq_hz, uint16_t sensor_pid);
 
-#if CONFIG_IDF_TARGET_ESP32S3
 void cam_s3_dma_print_state(cam_obj_t* cam);
 void cam_s3_dma_reset(cam_obj_t* cam);
-#endif
 
 // implemented in cam_hal
 void cam_s3_send_event(cam_obj_t* cam, cam_event_t cam_event, BaseType_t* HPTaskAwoken);

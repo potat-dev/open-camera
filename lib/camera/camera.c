@@ -33,13 +33,9 @@ typedef struct {
 static camera_state_t* s_state = NULL;
 static camera_config_t s_saved_config;
 
-#if CONFIG_IDF_TARGET_ESP32S3  // LCD_CAM module of ESP32-S3 will generate xclk
-    #define CAMERA_ENABLE_OUT_CLOCK(v)
-    #define CAMERA_DISABLE_OUT_CLOCK()
-#else
-    #define CAMERA_ENABLE_OUT_CLOCK(v) camera_enable_out_clock((v))
-    #define CAMERA_DISABLE_OUT_CLOCK() camera_disable_out_clock()
-#endif
+// LCD_CAM module of ESP32-S3 will generate xclk
+#define CAMERA_ENABLE_OUT_CLOCK(v)
+#define CAMERA_DISABLE_OUT_CLOCK()
 
 typedef struct {
     int (*detect)(int slv_addr, sensor_id_t* id);
