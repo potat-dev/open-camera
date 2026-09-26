@@ -141,6 +141,13 @@ void cam_fb_return(camera_fb_t* fb);
 sensor_t* cam_sensor_get(void);
 
 /**
+ * @brief Get current framesize
+ *
+ * @return current framesize
+ */
+framesize_t cam_get_framesize(void);
+
+/**
  * @brief Return all frame buffers to be reused again.
  */
 void cam_return_all(void);

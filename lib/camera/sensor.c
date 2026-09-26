@@ -25,7 +25,7 @@ const resolution_info_t resolution[FRAMESIZE_INVALID] = {
     {1600, 1200, ASPECT_RATIO_4X3},  // UXGA
 };
 
-// More resolutions, just for reference:
+// More resolutions for reference:
 
 // 3MP Sensors
 // {1920, 1080, ASPECT_RATIO_16X9},  // FHD

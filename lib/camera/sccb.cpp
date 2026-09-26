@@ -47,28 +47,3 @@ extern "C" int SCCB_Write(uint8_t slv_addr, uint8_t reg, uint8_t data) {
     s_wire->write(data);
     return (s_wire->endTransmission() == 0) ? 0 : -1;
 }
-
-// Stubs for 16-bit operations (not used by OV2640, satisfies sccb.h)
-
-extern "C" uint8_t SCCB_Read16(uint8_t slv_addr, uint16_t reg) {
-    (void)slv_addr;
-    (void)reg;
-    return 0;
-}
-extern "C" int SCCB_Write16(uint8_t slv_addr, uint16_t reg, uint8_t data) {
-    (void)slv_addr;
-    (void)reg;
-    (void)data;
-    return -1;
-}
-extern "C" uint16_t SCCB_Read_Addr16_Val16(uint8_t slv_addr, uint16_t reg) {
-    (void)slv_addr;
-    (void)reg;
-    return 0;
-}
-extern "C" int SCCB_Write_Addr16_Val16(uint8_t slv_addr, uint16_t reg, uint16_t data) {
-    (void)slv_addr;
-    (void)reg;
-    (void)data;
-    return -1;
-}

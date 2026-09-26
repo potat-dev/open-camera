@@ -51,19 +51,23 @@ typedef enum {
     FRAMESIZE_HD,       // 1280x720
     FRAMESIZE_SXGA,     // 1280x1024
     FRAMESIZE_UXGA,     // 1600x1200
-    // 3MP Sensors
-    // FRAMESIZE_FHD,    // 1920x1080
-    // FRAMESIZE_P_HD,   //  720x1280
-    // FRAMESIZE_P_3MP,  //  864x1536
-    // FRAMESIZE_QXGA,   // 2048x1536
-    // 5MP Sensors
-    // FRAMESIZE_QHD,    // 2560x1440
-    // FRAMESIZE_WQXGA,  // 2560x1600
-    // FRAMESIZE_P_FHD,  // 1080x1920
-    // FRAMESIZE_QSXGA,  // 2560x1920
-    // FRAMESIZE_5MP,    // 2592x1944
     FRAMESIZE_INVALID
 } framesize_t;
+
+// More frame sizes for reference:
+
+// 3MP Sensors
+// FRAMESIZE_FHD,    // 1920x1080
+// FRAMESIZE_P_HD,   //  720x1280
+// FRAMESIZE_P_3MP,  //  864x1536
+// FRAMESIZE_QXGA,   // 2048x1536
+
+// 5MP Sensors
+// FRAMESIZE_QHD,    // 2560x1440
+// FRAMESIZE_WQXGA,  // 2560x1600
+// FRAMESIZE_P_FHD,  // 1080x1920
+// FRAMESIZE_QSXGA,  // 2560x1920
+// FRAMESIZE_5MP,    // 2592x1944
 
 typedef struct {
     const camera_model_t     model;
@@ -176,8 +180,6 @@ typedef struct _sensor {
     int (*set_contrast)(sensor_t* sensor, int level);
     int (*set_brightness)(sensor_t* sensor, int level);
     int (*set_saturation)(sensor_t* sensor, int level);
-    int (*set_sharpness)(sensor_t* sensor, int level);
-    int (*set_denoise)(sensor_t* sensor, int level);
     int (*set_gainceiling)(sensor_t* sensor, gainceiling_t gainceiling);
     int (*set_quality)(sensor_t* sensor, int quality);
     int (*set_colorbar)(sensor_t* sensor, int enable);

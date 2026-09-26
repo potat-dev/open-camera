@@ -274,6 +274,14 @@ sensor_t* cam_sensor_get() {
     return &s_state->sensor;
 }
 
+// because now I can modify the driver and nobody can stop me
+framesize_t cam_get_framesize() {
+    if (s_state == NULL) {
+        return FRAMESIZE_INVALID;
+    }
+    return s_state->sensor.status.framesize;
+}
+
 void cam_return_all(void) {
     if (s_state == NULL) {
         return;
@@ -309,7 +317,6 @@ esp_err_t cam_set_raw_framesize(framesize_t framesize) {
     cam_stop();
 
     // reprogram sensor over I2C first (while DMA is paused)
-    s_state->sensor.status.framesize = framesize;
     if (s_state->sensor.set_framesize(&s_state->sensor, framesize) != 0) {
         ESP_LOGE(TAG, "Failed to set sensor frame size");
         cam_start();

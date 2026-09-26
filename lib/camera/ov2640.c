@@ -417,11 +417,6 @@ static int set_wpc_dsp(sensor_t* sensor, int enable) {
     return set_reg_bits(sensor, BANK_DSP, CTRL3, 6, 1, enable ? 1 : 0);
 }
 
-// unsupported
-static int set_sharpness(sensor_t* sensor, int level) { return -1; }
-
-static int set_denoise(sensor_t* sensor, int level) { return -1; }
-
 static int get_reg(sensor_t* sensor, int reg, int mask) {
     int ret = read_reg(sensor, (ov2640_bank_t)((reg >> 8) & 0x01), reg & 0xFF);
     if (ret > 0) {
@@ -549,10 +544,6 @@ int esp32_camera_ov2640_init(sensor_t* sensor) {
 
     sensor->set_raw_gma = set_raw_gma_dsp;
     sensor->set_lenc    = set_lenc_dsp;
-
-    // not supported
-    sensor->set_sharpness = set_sharpness;
-    sensor->set_denoise   = set_denoise;
 
     sensor->get_reg     = get_reg;
     sensor->set_reg     = set_reg;
