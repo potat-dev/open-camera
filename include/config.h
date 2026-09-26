@@ -55,7 +55,6 @@ constexpr uint16_t TICK_COUNT_MAX = 250;
 // camera params
 constexpr pixformat_t CAMERA_PIXFORMAT = PIXFORMAT_RGB565;  // RGB565 or YUV422, never JPEG
 constexpr framesize_t SIZE_VIEWFINDER  = FRAMESIZE_QVGA;
-constexpr framesize_t SIZE_CAPTURE     = FRAMESIZE_UXGA;
 constexpr uint8_t     IMAGE_QUALITY    = 85;  // JPEG quality for conversion
 
 // data transfer rate

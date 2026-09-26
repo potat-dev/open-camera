@@ -4,8 +4,8 @@
 
 enum MenuItemType : uint8_t {
     MENU_TOGGLE,
-    MENU_SELECT,
     MENU_INTEGER,
+    MENU_SELECT,
 };
 
 struct MenuItem {
@@ -140,11 +140,11 @@ class Menu {
             case MENU_TOGGLE:
                 snprintf(out, n, "%s", it->value ? "ON" : "OFF");
                 break;
-            case MENU_SELECT:
-                snprintf(out, n, "%s", (it->options && it->value < it->optionCount) ? it->options[it->value] : "?");
-                break;
             case MENU_INTEGER:
                 snprintf(out, n, "%d", it->value);
+                break;
+            case MENU_SELECT:
+                snprintf(out, n, "%s", (it->options && it->value < it->optionCount) ? it->options[it->value] : "?");
                 break;
         }
     }

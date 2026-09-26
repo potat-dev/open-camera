@@ -118,7 +118,7 @@ static camera_config_t build_camera_config() {
 
     config.pixel_format   = CAMERA_PIXFORMAT;
     config.frame_size     = SIZE_VIEWFINDER;
-    config.max_frame_size = SIZE_CAPTURE;
+    config.max_frame_size = FRAMESIZE_UXGA;
 
     config.fb_count     = 2;  // enable asymmetric double-buffering
     config.grab_mode    = CAMERA_GRAB_LATEST;
@@ -160,7 +160,6 @@ static void configure_camera() {
     s->set_contrast(s, contrast.value);
     s->set_brightness(s, brightness.value);
     s->set_saturation(s, saturation.value);
-    s->set_sharpness(s, sharpness.value);
     // s->set_ae_level(s, 0);
 
     // // image correction values
@@ -189,16 +188,17 @@ bool camera_init() {
 
 // SD card
 
-char* getFilename(const uint16_t index, const char* suffix = "jpg") {
+char* getFilename(const uint16_t index, const char* res, const char* suffix = "jpg") {
+    // example: /pic_0012_720p.jpg
     static char name[32];
-    snprintf(name, sizeof(name), "/pic_%04d.%s", index, suffix);
+    snprintf(name, sizeof(name), "/pic_%04d_%s.%s", index, res, suffix);
     return name;
 }
 
 void findNextPhotoIndex() {
     char* name = NULL;
     while (nextPhotoIndex < 10000) {
-        name = getFilename(nextPhotoIndex);
+        name = getFilename(nextPhotoIndex, "240p", "thumb");  // hardcode for always-created thumbs TODO: refactor
         if (!SD.exists(name)) break;
         nextPhotoIndex++;
     }
@@ -226,25 +226,27 @@ void unmountSD() {
     digitalWrite(SD_CS, HIGH);
 }
 
-bool saveData(const char* filename, const uint8_t* data, size_t size) {
-    if (!mountSD()) {
-        Serial.println("Error: Failed to mount SD card");
-        return false;
-    }
+// capture
+
+bool saveRawFrame(const camera_fb_t* frame, const char* resolution) {
+    char* filename = getFilename(nextPhotoIndex, resolution, "thumb");
 
     File file = SD.open(filename, FILE_WRITE, true);
     if (!file) {
-        Serial.println("Error: Failed to open file");
-        unmountSD();
+        ESP_LOGE("save_raw", "Failed to open file");
         return false;
     }
 
-    size_t written = file.write(data, size);
+    size_t written = file.write(frame->buf, frame->len);
     file.flush();
     file.close();
 
-    unmountSD();
-    return written == size;
+    if (written != frame->len) {
+        ESP_LOGE("save_raw", "Failed to write file");
+        return false;
+    }
+
+    return true;
 }
 
 static size_t save_photo_chunk(void* arg, size_t index, const void* data, size_t size) {
@@ -252,142 +254,119 @@ static size_t save_photo_chunk(void* arg, size_t index, const void* data, size_t
     return file->write(static_cast<const uint8_t*>(data), size);
 }
 
-bool captureThumb() {
-    bool ok;
+bool saveImage(const camera_fb_t* frame, const char* resolution) {
+    char* filename = getFilename(nextPhotoIndex, resolution);
 
-    ESP_LOGI("thumb", "Capture entered, waiting for DMA");
-    display.waitDMA();
-
-    ESP_LOGI("thumb", "Capturing thumbnail frame");
-    camera_fb_t* frame = cam_fb_get();
-    if (!frame) {
-        Serial.println("Capture failed");
-        return false;
-    }
-
-    ESP_LOGI("thumb", "Capture done, opening file");
-    ok = mountSD();
-    if (!ok) {
-        Serial.println("Error: Failed to mount SD card");
-        cam_fb_return(frame);
-        return false;
-    }
-
-    char* filename = getFilename(nextPhotoIndex, "thumb");
-    File  file     = SD.open(filename, FILE_WRITE, true);  // TODO: reuse saveData
+    File file = SD.open(filename, FILE_WRITE, true);
     if (!file) {
-        Serial.println("Error: Failed to open file");
-        cam_fb_return(frame);
-        unmountSD();
+        ESP_LOGE("save_image", "Failed to open file");
         return false;
     }
 
-    ESP_LOGI("thumb", "File open, saving");
-    ok = file.write(frame->buf, frame->len) == frame->len;
-
+    bool ok = frame2jpg_cb(frame, IMAGE_QUALITY, save_photo_chunk, &file);
     file.flush();
     file.close();
 
     if (!ok) {
-        ESP_LOGE("thumb", "Save failed");
+        ESP_LOGE("save_image", "Failed to convert and write image");
         return false;
     }
 
-    ESP_LOGI("thumb", "Save done");
-    if (!CAPTURE_THUMBS_JPG) {
-        cam_fb_return(frame);
-        unmountSD();
+    return true;
+}
+
+bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
+    bool         ok;
+    esp_err_t    err;
+    camera_fb_t* frame;
+
+    if (mode == CAPTURE_NO) {
+        ESP_LOGI("capture", "No need to capture framesize %d", size);
         return true;
     }
 
-    ESP_LOGI("thumb", "Opening file for JPEG variant");
+    ESP_LOGD("capture", "Waiting for DMA");
+    display.waitDMA();  // TODO: research, if this line is really needed
+    // and if needed, how, and where to move it
 
-    // TODO: call some common saveJPEG() instead (see EOF below)
-    filename = getFilename(nextPhotoIndex, "thumb.jpg");
-    file     = SD.open(filename, FILE_WRITE, true);  // TODO: reuse saveData
-    if (!file) {
-        Serial.println("Error: Failed to open file");
+    if (size != cam_get_framesize()) {
+        ESP_LOGD("capture", "Changing framesize");
+        err = cam_set_raw_framesize(size);
+        if (err != ESP_OK) {
+            ESP_LOGE("capture", "Failed to set framesize");
+            return false;
+        }
+
+        ESP_LOGD("capture", "Capturing dummy frame");
+        frame = cam_fb_get();
+        if (frame == NULL) {
+            ESP_LOGE("capture", "Capture failed");
+            return false;
+        }
+
         cam_fb_return(frame);
-        unmountSD();
+    }
+
+    ESP_LOGI("capture", "Capturing actual frame");
+    frame = cam_fb_get();
+    if (frame == NULL) {
+        ESP_LOGE("capture", "Capture failed");
         return false;
     }
 
-    ESP_LOGI("thumb", "File open, converting and saving");
-    ok = frame2jpg_cb(frame, IMAGE_QUALITY, save_photo_chunk, &file);
-    cam_fb_return(frame);
+    ok = mountSD();
+    if (!ok) {
+        ESP_LOGE("capture", "Failed to mount SD");
+        cam_fb_return(frame);
+        return false;
+    }
 
-    file.flush();
-    file.close();
+    if (mode & CAPTURE_RAW) {
+        ESP_LOGI("capture", "Saving RAW frame");
+        ok = saveRawFrame(frame, resolution);
+        if (!ok) {
+            ESP_LOGE("capture", "Failed to save RAW frame");
+            cam_fb_return(frame);
+            unmountSD();
+            return false;
+        }
+        ESP_LOGI("capture", "Save success");
+    }
+
+    if (mode & CAPTURE_JPEG) {
+        ESP_LOGI("capture", "Saving JPEG image");
+        ok = saveImage(frame, resolution);
+        if (!ok) {
+            ESP_LOGE("capture", "Failed to save JPEG image");
+            cam_fb_return(frame);
+            unmountSD();
+            return false;
+        }
+        ESP_LOGI("capture", "Save success");
+    }
+
     unmountSD();
 
-    if (!ok) {
-        ESP_LOGE("thumb", "JPEG compression and save failed");
-        return false;
-    }
-
-    ESP_LOGI("thumb", "JPEG compression and save done");
+    nextPhotoIndex++;
     return true;
 }
 
 void capture() {
-    bool ok;
+    for (size_t i = 0; i < captureSizesCount; i++) {
+        uint8_t     mode       = captureSettings[i]->value;
+        const char* resolution = captureSettings[i]->name;
 
-    if (CAPTURE_THUMBS_RAW) {
-        ok = captureThumb();
+        if (captureSizes[i] == SIZE_VIEWFINDER) mode |= CAPTURE_RAW;  // always capture RAW for gallery previews
+        if (mode == CAPTURE_NO) continue;
+
+        bool ok = captureImage(captureSizes[i], mode, resolution);
         if (!ok) {
-            Serial.println("Thumb capture failed");
-            return;
+            ESP_LOGE("capture", "Failed to capture %s", captureSettings[i]->name);
+            continue;
         }
+
+        ESP_LOGI("capture", "Capture %s success", captureSettings[i]->name);
     }
-
-    ESP_LOGI("capture", "Capture entered, waiting for DMA");
-    display.waitDMA();
-
-    ESP_LOGI("capture", "Preserving gains and changing mode");
-    cam_set_raw_framesize(SIZE_CAPTURE);
-
-    ESP_LOGI("capture", "Reading dummy frame");
-    camera_fb_t* dummy = cam_fb_get();
-    if (dummy) cam_fb_return(dummy);
-
-    ESP_LOGI("capture", "Capturing actual frame");
-    camera_fb_t* frame = cam_fb_get();
-    if (!frame) {
-        Serial.println("Capture failed");
-        return;
-    }
-
-    ESP_LOGI("capture", "Capture done, opening file");
-    ok = mountSD();
-    if (!ok) {
-        Serial.println("Error: Failed to mount SD card");
-        cam_fb_return(frame);
-        return;
-    }
-
-    char* filename = getFilename(nextPhotoIndex++);
-    File  file     = SD.open(filename, FILE_WRITE, true);
-    if (!file) {
-        Serial.println("Error: Failed to open file");
-        cam_fb_return(frame);
-        unmountSD();
-        return;
-    }
-
-    ESP_LOGI("capture", "File open, converting and saving");
-    ok = frame2jpg_cb(frame, IMAGE_QUALITY, save_photo_chunk, &file);
-    cam_fb_return(frame);
-
-    file.flush();
-    file.close();
-    unmountSD();
-
-    if (!ok) {
-        ESP_LOGE("capture", "JPEG compression and save failed");
-        return;
-    }
-
-    ESP_LOGI("capture", "JPEG compression and save done");
 }
 
 void setup() {

@@ -35,7 +35,7 @@ static void* _malloc(size_t size) {
 }
 
 static IRAM_ATTR void convert_line_format(
-    uint8_t* src, pixformat_t format, uint8_t* dst, size_t width, size_t in_channels, size_t line) {
+    const uint8_t* src, pixformat_t format, uint8_t* dst, size_t width, size_t in_channels, size_t line) {
     int i = 0, o = 0, l = 0;
     if (format == PIXFORMAT_GRAYSCALE) {
         memcpy(dst, src + line * width, width);
@@ -85,7 +85,7 @@ static IRAM_ATTR void convert_line_format(
     }
 }
 
-bool convert_image(uint8_t* src, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+bool convert_image(const uint8_t* src, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
     jpge::output_stream* dst_stream) {
     int                 num_channels = 3;
     jpge::subsampling_t subsampling  = default_subsampling;
@@ -152,13 +152,13 @@ class callback_stream : public jpge::output_stream {
     virtual size_t get_size() const { return index; }
 };
 
-bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+bool fmt2jpg_cb(const uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
     jpg_out_cb cb, void* arg) {
     callback_stream dst_stream(cb, arg);
     return convert_image(src, width, height, format, quality, &dst_stream);
 }
 
-bool frame2jpg_cb(camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg) {
+bool frame2jpg_cb(const camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg) {
     return fmt2jpg_cb(fb->buf, fb->len, fb->width, fb->height, fb->format, quality, cb, arg);
 }
 

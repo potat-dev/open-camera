@@ -27,7 +27,7 @@ typedef size_t (*jpg_out_cb)(void* arg, size_t index, const void* data, size_t l
  *
  * @return true on success
  */
-bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
+bool fmt2jpg_cb(const uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
     jpg_out_cb cb, void* arg);
 
 /**
@@ -40,7 +40,7 @@ bool fmt2jpg_cb(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, p
  *
  * @return true on success
  */
-bool frame2jpg_cb(camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg);
+bool frame2jpg_cb(const camera_fb_t* fb, uint8_t quality, jpg_out_cb cb, void* arg);
 
 /**
  * @brief Convert image buffer to JPEG buffer
