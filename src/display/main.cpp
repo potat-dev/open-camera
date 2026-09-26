@@ -28,7 +28,7 @@ static uint8_t  countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
 // TODO: extract into photo manager class
-static uint16_t nextPhotoIndex = 1;
+static uint16_t photoIndex = 1;
 
 // buttons
 
@@ -188,19 +188,37 @@ bool camera_init() {
 
 // SD card
 
-char* getFilename(const uint16_t index, const char* res, const char* suffix = "jpg") {
-    // example: /pic_0012_720p.jpg
+char* getFilename(const uint16_t index, uint8_t mode, const char* res = NULL) {
+    // examples:
+    // - images/0042_720p.jpg
+    // - raw/0067_240p.raw
+    // - thumb/0123.thumb
     static char name[32];
-    snprintf(name, sizeof(name), "/pic_%04d_%s.%s", index, res, suffix);
-    return name;
+
+    if (mode & CAPTURE_THUMB) {
+        snprintf(name, sizeof(name), "/thumb/%04d.thumb", index);
+        return name;
+    }
+
+    if (mode & CAPTURE_RAW) {
+        snprintf(name, sizeof(name), "/raw/%04d_%s.raw", index, res);
+        return name;
+    }
+
+    if (mode & CAPTURE_JPEG) {
+        snprintf(name, sizeof(name), "/images/%04d_%s.jpg", index, res);
+        return name;
+    }
+
+    return NULL;
 }
 
 void findNextPhotoIndex() {
     char* name = NULL;
-    while (nextPhotoIndex < 10000) {
-        name = getFilename(nextPhotoIndex, "240p", "thumb");  // hardcode for always-created thumbs TODO: refactor
+    while (photoIndex < 10000) {
+        name = getFilename(photoIndex, CAPTURE_THUMB);  // check for always-created thumbs
         if (!SD.exists(name)) break;
-        nextPhotoIndex++;
+        photoIndex++;
     }
     Serial.printf("Next photo will be: %s\n", name);
 }
@@ -228,9 +246,7 @@ void unmountSD() {
 
 // capture
 
-bool saveRawFrame(const camera_fb_t* frame, const char* resolution) {
-    char* filename = getFilename(nextPhotoIndex, resolution, "thumb");
-
+bool saveRawFrame(const camera_fb_t* frame, const char* filename) {
     File file = SD.open(filename, FILE_WRITE, true);
     if (!file) {
         ESP_LOGE("save_raw", "Failed to open file");
@@ -254,9 +270,7 @@ static size_t save_photo_chunk(void* arg, size_t index, const void* data, size_t
     return file->write(static_cast<const uint8_t*>(data), size);
 }
 
-bool saveImage(const camera_fb_t* frame, const char* resolution) {
-    char* filename = getFilename(nextPhotoIndex, resolution);
-
+bool saveImage(const camera_fb_t* frame, const char* filename) {
     File file = SD.open(filename, FILE_WRITE, true);
     if (!file) {
         ESP_LOGE("save_image", "Failed to open file");
@@ -321,33 +335,39 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         return false;
     }
 
-    if (mode & CAPTURE_RAW) {
+    if (mode & CAPTURE_RAW_THUMB) {
+        char* file = getFilename(photoIndex, mode, resolution);
+
         ESP_LOGI("capture", "Saving RAW frame");
-        ok = saveRawFrame(frame, resolution);
+        ok = saveRawFrame(frame, file);
         if (!ok) {
             ESP_LOGE("capture", "Failed to save RAW frame");
             cam_fb_return(frame);
             unmountSD();
             return false;
         }
+
         ESP_LOGI("capture", "Save success");
     }
 
     if (mode & CAPTURE_JPEG) {
+        char* file = getFilename(photoIndex, CAPTURE_JPEG, resolution);
+
         ESP_LOGI("capture", "Saving JPEG image");
-        ok = saveImage(frame, resolution);
+        ok = saveImage(frame, file);
         if (!ok) {
             ESP_LOGE("capture", "Failed to save JPEG image");
             cam_fb_return(frame);
             unmountSD();
             return false;
         }
+
         ESP_LOGI("capture", "Save success");
     }
 
+    cam_fb_return(frame);
     unmountSD();
 
-    nextPhotoIndex++;
     return true;
 }
 
@@ -356,17 +376,24 @@ void capture() {
         uint8_t     mode       = captureSettings[i]->value;
         const char* resolution = captureSettings[i]->name;
 
-        if (captureSizes[i] == SIZE_VIEWFINDER) mode |= CAPTURE_RAW;  // always capture RAW for gallery previews
-        if (mode == CAPTURE_NO) continue;
+        // always capture RAW for gallery previews (thumbs)
+        if (captureSizes[i] == SIZE_VIEWFINDER) mode |= CAPTURE_THUMB;
 
-        bool ok = captureImage(captureSizes[i], mode, resolution);
-        if (!ok) {
-            ESP_LOGE("capture", "Failed to capture %s", captureSettings[i]->name);
+        if (mode == CAPTURE_NO) {
+            ESP_LOGD("capture", "No need to capture %s", resolution);
             continue;
         }
 
-        ESP_LOGI("capture", "Capture %s success", captureSettings[i]->name);
+        bool ok = captureImage(captureSizes[i], mode, resolution);
+        if (!ok) {
+            ESP_LOGE("capture", "Failed to capture %s", resolution);
+            continue;
+        }
+
+        ESP_LOGI("capture", "Capture %s success", resolution);
     }
+
+    photoIndex++;
 }
 
 void setup() {

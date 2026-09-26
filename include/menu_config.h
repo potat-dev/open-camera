@@ -4,6 +4,10 @@
 
 #include "sensor.h"
 
+// TODO: rewrite to a single settings class / struct
+// TODO: individual settings also as classes / structs
+// TODO: do not define vars in header file
+
 const char* modeOptions[] = {"Auto", "Manual", "Expert"};
 
 MenuItem contrast   = {"Contr", MENU_INTEGER, 0, nullptr, 0, -2, 2, 1};
@@ -20,10 +24,12 @@ MenuItem hFlip = {"FlipH", MENU_TOGGLE, 0};
 MenuItem vFlip = {"FlipV", MENU_TOGGLE, 0};
 
 enum CaptureOption : uint8_t {
-    CAPTURE_NO       = 0,
-    CAPTURE_JPEG     = 1 << 0,
-    CAPTURE_RAW      = 1 << 1,
-    CAPTURE_RAW_JPEG = CAPTURE_RAW | CAPTURE_JPEG,
+    CAPTURE_NO        = 0,
+    CAPTURE_JPEG      = 1 << 0,
+    CAPTURE_RAW       = 1 << 1,
+    CAPTURE_RAW_JPEG  = CAPTURE_RAW | CAPTURE_JPEG,
+    CAPTURE_THUMB     = 1 << 2,
+    CAPTURE_RAW_THUMB = CAPTURE_RAW | CAPTURE_THUMB,
 };
 
 const char* captureOptions[] = {"No", "JPEG", "RAW", "RAW+JPEG"};
