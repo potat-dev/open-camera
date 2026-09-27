@@ -229,18 +229,23 @@ void findPhotoIndex() {
 }
 
 bool mountSD(uint8_t max_attempts = 3, uint32_t retry_delay = 150) {
+    ESP_LOGD("sd", "Waiting for DMA");
     display.waitDMA();
+
     digitalWrite(DISPLAY_CS, HIGH);
     delay(5);
 
     for (uint8_t attempt = 1; attempt <= max_attempts; attempt++) {
         SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, NOT_CONNECTED);
         if (SD.begin(SD_CS, SPI, SD_CARD_SPI_FREQ)) return true;
+        ESP_LOGW("sd", "Mount attempt %d failed", attempt);
+
         SD.end();
         digitalWrite(SD_CS, HIGH);
         if (attempt < max_attempts) delay(retry_delay);
     }
 
+    ESP_LOGE("sd", "All mount attempts failed");
     return false;
 }
 
@@ -304,10 +309,6 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         return true;
     }
 
-    ESP_LOGD("capture", "Waiting for DMA");
-    display.waitDMA();  // TODO: research, if this line is really needed
-    // and if needed, how, and where to move it
-
     if (size != cam_get_framesize()) {
         ESP_LOGD("capture", "Changing framesize");
         err = cam_set_raw_framesize(size);
@@ -333,13 +334,6 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         return false;
     }
 
-    ok = mountSD();
-    if (!ok) {
-        ESP_LOGE("capture", "Failed to mount SD");
-        cam_fb_return(frame);
-        return false;
-    }
-
     if (mode & CAPTURE_THUMB) {
         char* file = getFilename(photoIndex, CAPTURE_THUMB, resolution);
 
@@ -348,7 +342,6 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         if (!ok) {
             ESP_LOGE("capture", "Failed to save thumb");
             cam_fb_return(frame);
-            unmountSD();
             return false;
         }
 
@@ -363,7 +356,6 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         if (!ok) {
             ESP_LOGE("capture", "Failed to save RAW frame");
             cam_fb_return(frame);
-            unmountSD();
             return false;
         }
 
@@ -378,7 +370,6 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         if (!ok) {
             ESP_LOGE("capture", "Failed to save JPEG image");
             cam_fb_return(frame);
-            unmountSD();
             return false;
         }
 
@@ -386,12 +377,18 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
     }
 
     cam_fb_return(frame);
-    unmountSD();
-
     return true;
 }
 
-void capture() {
+bool capture() {
+    bool ok;
+
+    ok = mountSD();
+    if (!ok) {
+        ESP_LOGE("capture", "Failed to mount SD card");
+        return false;
+    }
+
     for (size_t i = 0; i < captureSizesCount; i++) {
         uint8_t     mode       = captureSettings[i]->value;
         const char* resolution = captureSettings[i]->name;
@@ -404,16 +401,20 @@ void capture() {
             continue;
         }
 
-        bool ok = captureImage(captureSizes[i], mode, resolution);
+        ok = captureImage(captureSizes[i], mode, resolution);
         if (!ok) {
             ESP_LOGE("capture", "Failed to capture %s", resolution);
             continue;
         }
 
         ESP_LOGI("capture", "Capture %s success", resolution);
+        // TODO: draw message on display
     }
 
+    unmountSD();
     photoIndex++;
+
+    return true;
 }
 
 void setup() {
@@ -499,9 +500,10 @@ void transitionTo(State next) {
             break;
 
         case PICTURE:
-            drawFrame();
+            drawFrame();  // draw frame without countdown
             updateDisplay();
             capture();
+            // TODO: conditional auto exit to viewfinder
             break;
 
         default:
