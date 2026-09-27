@@ -1,7 +1,9 @@
-#include "cam_s3.h"
 #include <stdio.h>
 #include <string.h>
+
 #include "cam_hal.h"
+#include "cam_s3.h"
+
 #include "esp_private/gdma.h"
 #include "esp_rom_gpio.h"
 #include "hal/clk_gate_ll.h"

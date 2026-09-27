@@ -30,6 +30,10 @@ static uint32_t countdown_tmr = 0;
 // TODO: extract into photo manager class
 static int16_t photoIndex = NOT_CONNECTED;  // by default: no SD card
 
+static uint32_t viewfinder_tmr    = 0;
+static uint32_t viewfinder_frames = 0;
+static float    viewfinder_fps    = 0.0;
+
 // buttons
 
 Button btnA(BTN_A);
@@ -120,7 +124,7 @@ static camera_config_t build_camera_config() {
     config.frame_size     = SIZE_VIEWFINDER;
     config.max_frame_size = FRAMESIZE_UXGA;
 
-    config.fb_count     = 2;  // enable asymmetric double-buffering
+    config.fb_count     = BUFFER_COUNT;
     config.grab_mode    = CAMERA_GRAB_LATEST;
     config.xclk_freq_hz = CAMERA_PCLK_FREQ;
 
@@ -509,7 +513,8 @@ void transitionTo(State next) {
     // entry action
     switch (state) {
         case VIEWFINDER:
-            cam_set_raw_framesize(SIZE_VIEWFINDER);
+            cam_set_raw_framesize(SIZE_VIEWFINDER);  // TODO: error handling
+            viewfinder_tmr = millis();
             break;
 
         case COUNTDOWN:
@@ -527,6 +532,13 @@ void transitionTo(State next) {
         default:
             break;
     }
+}
+
+void drawFPS() {
+    canvas.setTextSize(2);
+    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+    canvas.setTextDatum(lgfx::top_right);
+    canvas.drawFloat(viewfinder_fps, 2, DISPLAY_WIDTH - 24, 24);
 }
 
 void handleViewfinder() {
@@ -552,7 +564,10 @@ void handleViewfinder() {
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
     drawFrame();
+    drawFPS();
     updateDisplay();
+    viewfinder_frames++;
+    viewfinder_fps = 1000.0 * viewfinder_frames / (float)(millis() - viewfinder_tmr);
 }
 
 void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
@@ -584,7 +599,7 @@ void drawCountdown() {
     canvas.setTextSize(4);
     canvas.setTextColor(TFT_WHITE, TFT_BLACK);
     canvas.setTextDatum(lgfx::baseline_center);
-    canvas.drawString(buf, 320 / 2, 240 - 24);
+    canvas.drawString(buf, DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 24);
 }
 
 int8_t getCountdownInc(int8_t amount) {
