@@ -31,13 +31,13 @@ enum CaptureOption : uint8_t {
     CAPTURE_THUMB    = 1 << 2,
 };
 
-const char* captureOptions[] = {"No", "JPEG", "RAW", "RAW+JPEG"};
+const char* captureOptions[] = {"OFF", "JPEG", "RAW", "RAW+JPEG"};
 
 // all useful ASPECT_RATIO_4X3 modes
-MenuItem captureQVGA = {"240p", MENU_SELECT, CAPTURE_RAW_JPEG, captureOptions, 4};
+MenuItem captureQVGA = {"240p", MENU_SELECT, CAPTURE_JPEG, captureOptions, 4};
 MenuItem captureVGA  = {"480p", MENU_SELECT, CAPTURE_JPEG, captureOptions, 4};
 MenuItem captureSVGA = {"600p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
-MenuItem captureXGA  = {"768p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
+MenuItem captureXGA  = {"768p", MENU_SELECT, CAPTURE_JPEG, captureOptions, 4};
 MenuItem captureUXGA = {"1200p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
 
 constexpr size_t captureSizesCount = 5;
@@ -72,7 +72,9 @@ MenuItem dcw      = {"DCW", MENU_TOGGLE, 1};
 
 MenuItem menuScale = {"TextSize", MENU_INTEGER, 2, nullptr, 0, 2, 3, 1};
 
-MenuItem* menuItems[] = {
+constexpr size_t menuItemsCount = 24;
+
+MenuItem* menuItems[menuItemsCount] = {
     &contrast,
     &brightness,
     &saturation,
@@ -99,4 +101,4 @@ MenuItem* menuItems[] = {
     &menuScale,
 };
 
-Menu menu(menuItems, 20);
+Menu menu(menuItems, menuItemsCount);
