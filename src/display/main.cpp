@@ -408,7 +408,8 @@ bool capture() {
         }
 
         ESP_LOGI("capture", "Capture %s success", resolution);
-        // TODO: draw message on display
+        // TODO: draw message on display (note: impossible when SD is mounted)
+        // TODO: flash an indicator led (maybe ring)
     }
 
     unmountSD();
@@ -417,13 +418,9 @@ bool capture() {
     return true;
 }
 
-void setup() {
-    Serial.begin(115200);
-    Serial.setDebugOutput(true);
-
+void initSPI() {
     delay(1500);  // stabilize SD card
 
-    // setup SPI pins
     pinMode(DISPLAY_CS, OUTPUT);
     digitalWrite(DISPLAY_CS, HIGH);
 
@@ -432,9 +429,31 @@ void setup() {
 
     gpio_set_drive_capability((gpio_num_t)SD_CS, GPIO_DRIVE_CAP_3);
     pinMode(SPI_MISO, INPUT_PULLUP);
+}
 
-    bool sd_ok = mountSD();
-    if (sd_ok) {
+bool initDisplay() {
+    bool ok = display.init();
+    if (!ok) return false;
+
+    display.setSwapBytes(false);
+
+    canvas.setPsram(true);
+    canvas.setColorDepth(16);
+    canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+    return true;
+}
+
+void setup() {
+    bool ok;
+
+    Serial.begin(115200);
+    Serial.setDebugOutput(true);
+
+    initSPI();
+
+    ok = mountSD();
+    if (ok) {
         ESP_LOGI("init", "SD Card detected with size: %llu MB", SD.cardSize() / (1024 * 1024));
         findPhotoIndex();
         unmountSD();
@@ -442,18 +461,17 @@ void setup() {
         ESP_LOGE("init", "Failed to mount SD card");
     }
 
-    bool cam_ok = camera_init();
-    if (!cam_ok) {
-        ESP_LOGE("init", "Camera initialization failed");
+    ok = camera_init();
+    if (!ok) {
+        ESP_LOGE("init", "Camera init failed");
         return;
     }
 
-    display.init();
-    display.setSwapBytes(false);
-
-    canvas.setPsram(true);
-    canvas.setColorDepth(16);
-    canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    ok = initDisplay();
+    if (!ok) {
+        ESP_LOGE("init", "Display init failed");
+        return;
+    }
 
     ESP_LOGI("init", "Init done");
 }
