@@ -55,7 +55,7 @@ constexpr uint16_t TICK_COUNT_MAX = 250;
 // camera params
 constexpr pixformat_t CAMERA_PIXFORMAT = PIXFORMAT_RGB565;  // RGB565 or YUV422, never JPEG
 constexpr framesize_t SIZE_VIEWFINDER  = FRAMESIZE_QVGA;
-constexpr uint8_t     IMAGE_QUALITY    = 85;  // JPEG quality for conversion
+constexpr uint8_t     IMAGE_QUALITY    = 90;  // JPEG quality for conversion
 
 // data transfer rate
 constexpr uint32_t DISPLAY_FREQ_WRITE = 80_MHz;  // pizdets
@@ -66,7 +66,3 @@ constexpr uint32_t CAMERA_PCLK_FREQ   = 24_MHz;  // 20 works stable, but I love 
 
 // SPI
 constexpr spi_host_device_t SPI_HOST = SPI2_HOST;
-
-// settings
-constexpr bool CAPTURE_THUMBS_RAW = true;
-constexpr bool CAPTURE_THUMBS_JPG = true;

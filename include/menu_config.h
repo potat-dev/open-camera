@@ -24,39 +24,37 @@ MenuItem hFlip = {"FlipH", MENU_TOGGLE, 0};
 MenuItem vFlip = {"FlipV", MENU_TOGGLE, 0};
 
 enum CaptureOption : uint8_t {
-    CAPTURE_NO        = 0,
-    CAPTURE_JPEG      = 1 << 0,
-    CAPTURE_RAW       = 1 << 1,
-    CAPTURE_RAW_JPEG  = CAPTURE_RAW | CAPTURE_JPEG,
-    CAPTURE_THUMB     = 1 << 2,
-    CAPTURE_RAW_THUMB = CAPTURE_RAW | CAPTURE_THUMB,
+    CAPTURE_NO       = 0,
+    CAPTURE_JPEG     = 1 << 0,
+    CAPTURE_RAW      = 1 << 1,
+    CAPTURE_RAW_JPEG = CAPTURE_RAW | CAPTURE_JPEG,
+    CAPTURE_THUMB    = 1 << 2,
 };
 
 const char* captureOptions[] = {"No", "JPEG", "RAW", "RAW+JPEG"};
-MenuItem    captureQVGA      = {"240p", MENU_SELECT, CAPTURE_RAW_JPEG, captureOptions, 4};
-MenuItem    captureHVGA      = {"320p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
-MenuItem    captureVGA       = {"480p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
-MenuItem    captureSVGA      = {"600p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
-MenuItem    captureHD        = {"720p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
-MenuItem    captureUXGA      = {"1200p", MENU_SELECT, CAPTURE_JPEG, captureOptions, 4};
 
-constexpr size_t captureSizesCount = 6;
+// all useful ASPECT_RATIO_4X3 modes
+MenuItem captureQVGA = {"240p", MENU_SELECT, CAPTURE_RAW_JPEG, captureOptions, 4};
+MenuItem captureVGA  = {"480p", MENU_SELECT, CAPTURE_JPEG, captureOptions, 4};
+MenuItem captureSVGA = {"600p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
+MenuItem captureXGA  = {"768p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
+MenuItem captureUXGA = {"1200p", MENU_SELECT, CAPTURE_NO, captureOptions, 4};
+
+constexpr size_t captureSizesCount = 5;
 
 const framesize_t captureSizes[captureSizesCount] = {
     FRAMESIZE_QVGA,
-    FRAMESIZE_HVGA,
     FRAMESIZE_VGA,
     FRAMESIZE_SVGA,
-    FRAMESIZE_HD,
+    FRAMESIZE_XGA,
     FRAMESIZE_UXGA,
 };
 
 const MenuItem* captureSettings[captureSizesCount] = {
     &captureQVGA,
-    &captureHVGA,
     &captureVGA,
     &captureSVGA,
-    &captureHD,
+    &captureXGA,
     &captureUXGA,
 };
 
@@ -83,10 +81,9 @@ MenuItem* menuItems[] = {
     &hFlip,
     &vFlip,
     &captureQVGA,
-    &captureHVGA,
     &captureVGA,
     &captureSVGA,
-    &captureHD,
+    &captureXGA,
     &captureUXGA,
     &expCtrl,
     &gainCtrl,

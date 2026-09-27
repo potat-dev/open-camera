@@ -28,7 +28,7 @@ static uint8_t  countdown     = 0;
 static uint32_t countdown_tmr = 0;
 
 // TODO: extract into photo manager class
-static uint16_t photoIndex = 1;
+static int16_t photoIndex = NOT_CONNECTED;  // by default: no SD card
 
 // buttons
 
@@ -177,10 +177,8 @@ bool camera_init() {
     cam_deinit();
 
     camera_config_t config = build_camera_config();
-    if (cam_init(&config) != ESP_OK) {
-        Serial.println("Error: Camera initialization failed");
-        return false;
-    }
+    esp_err_t       err    = cam_init(&config);
+    if (err != ESP_OK) return false;
 
     configure_camera();
     return true;
@@ -196,31 +194,38 @@ char* getFilename(const uint16_t index, uint8_t mode, const char* res = NULL) {
     static char name[32];
 
     if (mode & CAPTURE_THUMB) {
-        snprintf(name, sizeof(name), "/thumb/%04d.thumb", index);
+        snprintf(name, sizeof(name), "/thumb/%04u.thumb", index);
         return name;
     }
 
     if (mode & CAPTURE_RAW) {
-        snprintf(name, sizeof(name), "/raw/%04d_%s.raw", index, res);
+        snprintf(name, sizeof(name), "/raw/%04u_%s.raw", index, res);
         return name;
     }
 
     if (mode & CAPTURE_JPEG) {
-        snprintf(name, sizeof(name), "/images/%04d_%s.jpg", index, res);
+        snprintf(name, sizeof(name), "/images/%04u_%s.jpg", index, res);
         return name;
     }
 
     return NULL;
 }
 
-void findNextPhotoIndex() {
+void findPhotoIndex() {
     char* name = NULL;
+    photoIndex = 0;
+
     while (photoIndex < 10000) {
         name = getFilename(photoIndex, CAPTURE_THUMB);  // check for always-created thumbs
-        if (!SD.exists(name)) break;
+        if (!SD.exists(name)) {
+            ESP_LOGI("photo", "Next photo index: %u", photoIndex);
+            return;
+        }
         photoIndex++;
     }
-    Serial.printf("Next photo will be: %s\n", name);
+
+    photoIndex = NOT_CONNECTED;
+    ESP_LOGE("photo", "Photo index overflow");
 }
 
 bool mountSD(uint8_t max_attempts = 3, uint32_t retry_delay = 150) {
@@ -335,8 +340,23 @@ bool captureImage(framesize_t size, uint8_t mode, const char* resolution) {
         return false;
     }
 
-    if (mode & CAPTURE_RAW_THUMB) {
-        char* file = getFilename(photoIndex, mode, resolution);
+    if (mode & CAPTURE_THUMB) {
+        char* file = getFilename(photoIndex, CAPTURE_THUMB, resolution);
+
+        ESP_LOGI("capture", "Saving thumb");
+        ok = saveRawFrame(frame, file);
+        if (!ok) {
+            ESP_LOGE("capture", "Failed to save thumb");
+            cam_fb_return(frame);
+            unmountSD();
+            return false;
+        }
+
+        ESP_LOGI("capture", "Save success");
+    }
+
+    if (mode & CAPTURE_RAW) {
+        char* file = getFilename(photoIndex, CAPTURE_RAW, resolution);
 
         ESP_LOGI("capture", "Saving RAW frame");
         ok = saveRawFrame(frame, file);
@@ -413,18 +433,17 @@ void setup() {
     pinMode(SPI_MISO, INPUT_PULLUP);
 
     bool sd_ok = mountSD();
-    if (!sd_ok) {
-        Serial.println("Error: Failed to mount SD card");
-        // TODO: conditional reboot
+    if (sd_ok) {
+        ESP_LOGI("init", "SD Card detected with size: %llu MB", SD.cardSize() / (1024 * 1024));
+        findPhotoIndex();
+        unmountSD();
+    } else {
+        ESP_LOGE("init", "Failed to mount SD card");
     }
-
-    Serial.printf("SD Card detected. Size: %llu MB\n", SD.cardSize() / (1024 * 1024));
-    findNextPhotoIndex();
-    unmountSD();
 
     bool cam_ok = camera_init();
     if (!cam_ok) {
-        Serial.println("Fatal: Camera initialization failed");
+        ESP_LOGE("init", "Camera initialization failed");
         return;
     }
 
@@ -434,12 +453,14 @@ void setup() {
     canvas.setPsram(true);
     canvas.setColorDepth(16);
     canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+    ESP_LOGI("init", "Init done");
 }
 
 void drawFrame() {
     camera_fb_t* fb = cam_fb_get();
-    if (!fb) {
-        Serial.println("Capture failed");
+    if (fb == NULL) {
+        ESP_LOGE("frame", "Capture failed");
         return;
     }
 
@@ -489,7 +510,7 @@ void transitionTo(State next) {
 }
 
 void handleViewfinder() {
-    if (btnX.click()) {
+    if (btnX.click() && photoIndex > NOT_CONNECTED) {
         transitionTo(COUNTDOWN);
         return;
     }
