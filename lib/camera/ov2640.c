@@ -160,17 +160,15 @@ static int set_window(
     };
 
     c.clk_2x    = 1;  // Enable 2x PLL (24 MHz * 2 = 48 MHz)
-    c.pclk_auto = 1;  // MUST be 1 for DSP scaling in 480p/768p
+    c.pclk_auto = 1;  // Required for DSP scaling
 
     switch (mode) {
         case OV2640_MODE_CIF:
-            // 24 MHz base XCLK, divider = 1 -> 24 MHz DSP
-            // PCLK = 12 MHz -> Unlocks 25 - 30 FPS free-running!
-            c.clk_2x    = 1;
-            c.clk_div   = 1;
-            c.pclk_auto = 1;
-            c.pclk_div  = 2;
-            regs        = ov2640_settings_to_cif;
+            // 24 MHz input clock, divider = 1 -> 30 FPS sensor core
+            c.clk_2x   = 0;
+            c.clk_div  = 0;
+            c.pclk_div = 2;
+            regs       = ov2640_settings_to_cif;
             break;
 
         case OV2640_MODE_SVGA:
@@ -199,13 +197,14 @@ static int set_window(
     WRITE_REG_OR_RETURN(BANK_DSP, R_DVP_SP, c.pclk);
 
     if (mode == OV2640_MODE_CIF) {
-        // 1. Zero out extra vertical blanking dummy rows (ADDVSH / ADDVSL)
-        write_reg(sensor, BANK_SENSOR, 0x2D, 0x00);
-        write_reg(sensor, BANK_SENSOR, 0x2E, 0x00);
-
-        // 2. Collapse frame length expansion (FLH / FLL)
-        write_reg(sensor, BANK_SENSOR, 0x46, 0x00);
-        write_reg(sensor, BANK_SENSOR, 0x47, 0x00);
+        // Unlock 30 FPS core timing in BANK_SENSOR:
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x11, 0x00);  // CLKRC = 0x00 (Divider = 1)
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x2A, 0x00);  // Zero horizontal dummy pixels (MSB)
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x2B, 0x00);  // Zero horizontal dummy pixels (LSB)
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x46, 0x00);  // Zero vertical dummy lines (FLL)
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x47, 0x00);  // Zero vertical dummy lines (FLH)
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3C, 0x00);  // Disable 15 FPS auto-halving
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3D, 0x38);  // COM34 30 FPS framing
     }
 
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_EN);
