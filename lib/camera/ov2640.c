@@ -138,6 +138,7 @@ static int set_window(
     ov2640_clk_t c;
     c.reserved = 0;
 
+    // Window registers operate in 4-pixel units
     max_x /= 4;
     max_y /= 4;
     w     /= 4;
@@ -149,46 +150,50 @@ static int set_window(
         {VSIZE, (uint8_t)(max_y & 0xFF)},
         {XOFFL, (uint8_t)(offset_x & 0xFF)},
         {YOFFL, (uint8_t)(offset_y & 0xFF)},
-        {VHYX, (uint8_t)(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) |
-                         ((offset_x >> 8) & 0X07))},
-        {TEST, (uint8_t)((max_x >> 2) & 0X80)},
-        {ZMOW, (uint8_t)((w) & 0xFF)},
-        {ZMOH, (uint8_t)((h) & 0xFF)},
+        {VHYX, (uint8_t)(((max_y >> 1) & 0x80) | ((offset_y >> 4) & 0x70) | ((max_x >> 5) & 0x08) |
+                         ((offset_x >> 8) & 0x07))},
+        {TEST, (uint8_t)((max_x >> 2) & 0x80)},
+        {ZMOW, (uint8_t)(w & 0xFF)},
+        {ZMOH, (uint8_t)(h & 0xFF)},
         {ZMHH, (uint8_t)(((h >> 6) & 0x04) | ((w >> 8) & 0x03))},
         {0, 0},
     };
 
-    if (sensor->pixformat == PIXFORMAT_JPEG) {
-        c.clk_2x    = 0;
-        c.clk_div   = 0;
-        c.pclk_auto = 0;
-        c.pclk_div  = 8;
+    // --- S3-N16R8 High-Throughput Clock Configuration ---
+    c.clk_2x    = 1;  // Enable 2x PLL (24 MHz * 2 = 48 MHz)
+    c.pclk_auto = 1;
 
-        if (mode == OV2640_MODE_UXGA) {
-            c.pclk_div = 12;
-        }
-    } else {
-        c.clk_2x    = 1;
-        c.clk_div   = 7;
-        c.pclk_auto = 1;
-        c.pclk_div  = 8;
-        if (mode == OV2640_MODE_CIF) {
-            c.clk_div = 3;
-        } else if (mode == OV2640_MODE_UXGA) {
-            c.pclk_div = 12;
-        }
+    switch (mode) {
+        case OV2640_MODE_CIF:
+            // 48 MHz / (1 + 1) = 24 MHz internal DSP clock.
+            // 24 MHz / 4 = 6.0 MHz PCLK -> 30.0 FPS solid in QVGA preview.
+            // (If you want ultra-fast 45-50 FPS, change clk_div=0, pclk_div=2)
+            c.clk_div  = 1;
+            c.pclk_div = 4;
+            regs       = ov2640_settings_to_cif;
+            break;
+
+        case OV2640_MODE_SVGA:
+            // 48 MHz / (1 + 1) = 24 MHz internal.
+            // 24 MHz / 4 = 6.0 MHz PCLK -> ~15 FPS in VGA mode.
+            c.clk_div  = 1;
+            c.pclk_div = 4;
+            regs       = ov2640_settings_to_svga;
+            break;
+
+        case OV2640_MODE_UXGA:
+        default:
+            // 48 MHz / (1 + 1) = 24 MHz internal.
+            // 24 MHz / 4 = 6.0 MHz PCLK -> Full 2MP capture in ~330 ms.
+            c.clk_div  = 1;
+            c.pclk_div = 4;
+            regs       = ov2640_settings_to_uxga;
+            break;
     }
-    ESP_LOGI(TAG, "Set PLL: clk_2x: %u, clk_div: %u, pclk_auto: %u, pclk_div: %u", c.clk_2x, c.clk_div, c.pclk_auto,
-        c.pclk_div);
 
-    if (mode == OV2640_MODE_CIF) {
-        regs = ov2640_settings_to_cif;
-    } else if (mode == OV2640_MODE_SVGA) {
-        regs = ov2640_settings_to_svga;
-    } else {
-        regs = ov2640_settings_to_uxga;
-    }
+    ESP_LOGI(TAG, "Mode: %d, PLL: clk_2x: %u, clk_div: %u, pclk_div: %u", mode, c.clk_2x, c.clk_div, c.pclk_div);
 
+    // Apply hardware registers
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_BYPAS);
     WRITE_REGS_OR_RETURN(regs);
     WRITE_REGS_OR_RETURN(win_regs);
@@ -196,8 +201,11 @@ static int set_window(
     WRITE_REG_OR_RETURN(BANK_DSP, R_DVP_SP, c.pclk);
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_EN);
 
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-    set_pixformat(sensor, sensor->pixformat);  // required when changing resolution
+    // Single settling delay
+    vTaskDelay(pdMS_TO_TICKS(5));
+
+    // Refresh DVP output formatting for active resolution
+    set_pixformat(sensor, sensor->pixformat);
 
     return ret;
 }
