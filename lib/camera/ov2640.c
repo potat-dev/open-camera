@@ -166,10 +166,11 @@ static int set_window(
         case OV2640_MODE_CIF:
             // 24 MHz base XCLK, divider = 1 -> 24 MHz DSP
             // PCLK = 12 MHz -> Unlocks 25 - 30 FPS free-running!
-            c.clk_2x   = 0;
-            c.clk_div  = 0;
-            c.pclk_div = 2;
-            regs       = ov2640_settings_to_cif;
+            c.clk_2x    = 1;
+            c.clk_div   = 1;
+            c.pclk_auto = 1;
+            c.pclk_div  = 2;
+            regs        = ov2640_settings_to_cif;
             break;
 
         case OV2640_MODE_SVGA:
@@ -198,12 +199,13 @@ static int set_window(
     WRITE_REG_OR_RETURN(BANK_DSP, R_DVP_SP, c.pclk);
 
     if (mode == OV2640_MODE_CIF) {
-        // 1. Disable 14.3 FPS auto-reduction in analog sensor core
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3C, 0x00);
+        // 1. Zero out extra vertical blanking dummy rows (ADDVSH / ADDVSL)
+        write_reg(sensor, BANK_SENSOR, 0x2D, 0x00);
+        write_reg(sensor, BANK_SENSOR, 0x2E, 0x00);
 
-        // 2. Disable 50Hz/60Hz banding filter lock (Clear Bit 5 of COM8)
-        uint8_t com8 = read_reg(sensor, BANK_SENSOR, COM8);
-        WRITE_REG_OR_RETURN(BANK_SENSOR, COM8, com8 & ~COM8_BNDF_EN);
+        // 2. Collapse frame length expansion (FLH / FLL)
+        write_reg(sensor, BANK_SENSOR, 0x46, 0x00);
+        write_reg(sensor, BANK_SENSOR, 0x47, 0x00);
     }
 
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_EN);
