@@ -115,6 +115,8 @@ class LGFX_Display : public lgfx::LGFX_Device {
 LGFX_Display display;
 LGFX_Sprite  canvas(&display);
 
+void updateDisplay() { canvas.pushSprite(0, 0); }
+
 // camera
 
 static camera_config_t build_camera_config() {
@@ -444,6 +446,58 @@ bool capture() {
     return true;
 }
 
+void drawFrame() {
+    camera_fb_t* fb = cam_fb_get();
+    if (fb == NULL) {
+        ESP_LOGE("frame", "Capture failed");
+        return;
+    }
+
+    // canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
+    cam_fb_return(fb);
+}
+
+void transitionTo(State next) {
+    // exit action
+    switch (state) {
+        case SETTINGS:
+            if (menu.changed()) configure_camera();
+            break;
+
+        case COUNTDOWN:
+            countdown = 0;
+            break;
+
+        default:
+            break;
+    }
+
+    state = next;
+
+    // entry action
+    switch (state) {
+        case VIEWFINDER:
+            cam_set_raw_framesize(SIZE_VIEWFINDER);  // TODO: error handling
+            viewfinder_tmr = millis();
+            break;
+
+        case COUNTDOWN:
+            countdown     = TICK_COUNT;
+            countdown_tmr = millis() + TICK_TIME;
+            break;
+
+        case PICTURE:
+            drawFrame();  // draw frame without countdown
+            updateDisplay();
+            capture();
+            // TODO: conditional auto exit to viewfinder
+            break;
+
+        default:
+            break;
+    }
+}
+
 void initSPI() {
     delay(1500);  // stabilize SD card
 
@@ -500,60 +554,7 @@ void setup() {
     }
 
     ESP_LOGI("init", "Init done");
-}
-
-void drawFrame() {
-    camera_fb_t* fb = cam_fb_get();
-    if (fb == NULL) {
-        ESP_LOGE("frame", "Capture failed");
-        return;
-    }
-
-    canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
-    cam_fb_return(fb);
-}
-
-void updateDisplay() { canvas.pushSprite(0, 0); }
-
-void transitionTo(State next) {
-    // exit action
-    switch (state) {
-        case SETTINGS:
-            if (menu.changed()) configure_camera();
-            break;
-
-        case COUNTDOWN:
-            countdown = 0;
-            break;
-
-        default:
-            break;
-    }
-
-    state = next;
-
-    // entry action
-    switch (state) {
-        case VIEWFINDER:
-            cam_set_raw_framesize(SIZE_VIEWFINDER);  // TODO: error handling
-            viewfinder_tmr = millis();
-            break;
-
-        case COUNTDOWN:
-            countdown     = TICK_COUNT;
-            countdown_tmr = millis() + TICK_TIME;
-            break;
-
-        case PICTURE:
-            drawFrame();  // draw frame without countdown
-            updateDisplay();
-            capture();
-            // TODO: conditional auto exit to viewfinder
-            break;
-
-        default:
-            break;
-    }
+    transitionTo(VIEWFINDER);
 }
 
 void drawFPS() {
@@ -586,13 +587,16 @@ void handleViewfinder() {
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
     drawFrame();
-    drawFPS();
-    updateDisplay();
+    // drawFPS();
+    // updateDisplay();
+
+    static size_t counter = 0;
 
     uint32_t now = millis();
     frametime_ring.push(now - viewfinder_tmr);
     viewfinder_fps = 1000.0f / frametime_ring.avg();
     viewfinder_tmr = now;
+    if (counter++ % 100 == 0) Serial.printf("FPS: %f\n", viewfinder_fps);
 }
 
 void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
