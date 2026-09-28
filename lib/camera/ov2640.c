@@ -143,12 +143,20 @@ static int set_window(
     w     /= 4;
     h     /= 4;
 
-    uint8_t win_regs[][2] = {{BANK_SEL, BANK_DSP}, {HSIZE, (uint8_t)(max_x & 0xFF)}, {VSIZE, (uint8_t)(max_y & 0xFF)},
-        {XOFFL, (uint8_t)(offset_x & 0xFF)}, {YOFFL, (uint8_t)(offset_y & 0xFF)},
+    uint8_t win_regs[][2] = {
+        {BANK_SEL, BANK_DSP},
+        {HSIZE, (uint8_t)(max_x & 0xFF)},
+        {VSIZE, (uint8_t)(max_y & 0xFF)},
+        {XOFFL, (uint8_t)(offset_x & 0xFF)},
+        {YOFFL, (uint8_t)(offset_y & 0xFF)},
         {VHYX, (uint8_t)(((max_y >> 1) & 0X80) | ((offset_y >> 4) & 0X70) | ((max_x >> 5) & 0X08) |
                          ((offset_x >> 8) & 0X07))},
-        {TEST, (uint8_t)((max_x >> 2) & 0X80)}, {ZMOW, (uint8_t)((w) & 0xFF)}, {ZMOH, (uint8_t)((h) & 0xFF)},
-        {ZMHH, (uint8_t)(((h >> 6) & 0x04) | ((w >> 8) & 0x03))}, {0, 0}};
+        {TEST, (uint8_t)((max_x >> 2) & 0X80)},
+        {ZMOW, (uint8_t)((w) & 0xFF)},
+        {ZMOH, (uint8_t)((h) & 0xFF)},
+        {ZMHH, (uint8_t)(((h >> 6) & 0x04) | ((w >> 8) & 0x03))},
+        {0, 0},
+    };
 
     if (sensor->pixformat == PIXFORMAT_JPEG) {
         c.clk_2x    = 0;
@@ -160,11 +168,7 @@ static int set_window(
             c.pclk_div = 12;
         }
     } else {
-#if CONFIG_IDF_TARGET_ESP32
-        c.clk_2x = 0;
-#else
-        c.clk_2x = 1;
-#endif
+        c.clk_2x    = 1;
         c.clk_div   = 7;
         c.pclk_auto = 1;
         c.pclk_div  = 8;
