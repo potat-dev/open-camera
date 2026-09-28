@@ -30,9 +30,12 @@ static uint32_t countdown_tmr = 0;
 // TODO: extract into photo manager class
 static int16_t photoIndex = NOT_CONNECTED;  // by default: no SD card
 
-static uint32_t viewfinder_tmr    = 0;
-static uint32_t viewfinder_frames = 0;
-static float    viewfinder_fps    = 0.0;
+static float    viewfinder_fps                     = 0.0;
+static uint32_t viewfinder_tmr                     = 0;
+const uint32_t  frametime_ring_cap                 = 16;
+static uint32_t frametime_ring_size                = 0;
+static uint32_t frametime_ring_index               = 0;
+static uint32_t frametime_ring[frametime_ring_cap] = {0};
 
 // buttons
 
@@ -538,7 +541,7 @@ void drawFPS() {
     canvas.setTextSize(2);
     canvas.setTextColor(TFT_WHITE, TFT_BLACK);
     canvas.setTextDatum(lgfx::top_right);
-    canvas.drawFloat(viewfinder_fps, 2, DISPLAY_WIDTH - 24, 24);
+    canvas.drawFloat(viewfinder_fps, 1, DISPLAY_WIDTH - 24, 24);
 }
 
 void handleViewfinder() {
@@ -566,8 +569,16 @@ void handleViewfinder() {
     drawFrame();
     drawFPS();
     updateDisplay();
-    viewfinder_frames++;
-    viewfinder_fps = 1000.0 * viewfinder_frames / (float)(millis() - viewfinder_tmr);
+
+    uint32_t now = millis();
+
+    frametime_ring[(frametime_ring_index++) % frametime_ring_cap] = (now - viewfinder_tmr);
+    if (frametime_ring_size < frametime_ring_cap) frametime_ring_size++;
+
+    uint32_t frametime_sum = 0;
+    for (size_t i = 0; i < frametime_ring_size; i++) frametime_sum += frametime_ring[i];
+    viewfinder_fps = (frametime_ring_size * 1000.0f) / (float)(frametime_sum);
+    viewfinder_tmr = now;
 }
 
 void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
