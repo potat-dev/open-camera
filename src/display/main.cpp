@@ -30,12 +30,31 @@ static uint32_t countdown_tmr = 0;
 // TODO: extract into photo manager class
 static int16_t photoIndex = NOT_CONNECTED;  // by default: no SD card
 
-static float    viewfinder_fps                     = 0.0;
-static uint32_t viewfinder_tmr                     = 0;
-const uint32_t  frametime_ring_cap                 = 16;
-static uint32_t frametime_ring_size                = 0;
-static uint32_t frametime_ring_index               = 0;
-static uint32_t frametime_ring[frametime_ring_cap] = {0};
+class Ring {
+   private:
+    static constexpr size_t CAPACITY = 64;
+
+    uint32_t ring[CAPACITY] = {0};
+    size_t   size           = 0;
+    size_t   index          = 0;
+    uint64_t sum            = 0;
+
+   public:
+    void push(uint32_t value) {
+        sum         -= ring[index];
+        ring[index]  = value;
+        sum         += value;
+        index        = ++index % CAPACITY;
+        if (size < CAPACITY) size++;
+    }
+
+    float avg() { return (float)sum / size; }
+};
+
+static float    viewfinder_fps = 0.0;
+static uint32_t viewfinder_tmr = 0;
+
+Ring frametime_ring;
 
 // buttons
 
@@ -571,13 +590,8 @@ void handleViewfinder() {
     updateDisplay();
 
     uint32_t now = millis();
-
-    frametime_ring[(frametime_ring_index++) % frametime_ring_cap] = (now - viewfinder_tmr);
-    if (frametime_ring_size < frametime_ring_cap) frametime_ring_size++;
-
-    uint32_t frametime_sum = 0;
-    for (size_t i = 0; i < frametime_ring_size; i++) frametime_sum += frametime_ring[i];
-    viewfinder_fps = (frametime_ring_size * 1000.0f) / (float)(frametime_sum);
+    frametime_ring.push(now - viewfinder_tmr);
+    viewfinder_fps = 1000.0f / frametime_ring.avg();
     viewfinder_tmr = now;
 }
 
