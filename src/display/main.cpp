@@ -191,9 +191,11 @@ static void configure_camera() {
     // s->set_ae_level(s, 0);
 
     // // image correction values
-    // s->set_gainceiling(s, GAINCEILING_2X);  // 2X to 128X
-    // s->set_aec_value(s, 300);               // 0 to 1200
+    s->set_gainceiling(s, GAINCEILING_16X);  // 2X to 128X
+    s->set_exposure_ctrl(s, 0);              // 0 to 1200
+    s->set_aec_value(s, 250);                // 0 to 1200
     // s->set_agc_gain(s, 0);                  // 0 to 30
+    s->set_gain_ctrl(s, 1);  // 0 to 30
 
     s->set_special_effect(s, effect.value);
     s->set_wb_mode(s, whiteBalance.value);
@@ -453,7 +455,7 @@ void drawFrame() {
         return;
     }
 
-    // canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
+    canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
     cam_fb_return(fb);
 }
 
@@ -588,7 +590,7 @@ void handleViewfinder() {
 
     drawFrame();
     // drawFPS();
-    // updateDisplay();
+    updateDisplay();
 
     static size_t counter = 0;
 

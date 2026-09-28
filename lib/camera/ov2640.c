@@ -165,7 +165,7 @@ static int set_window(
     switch (mode) {
         case OV2640_MODE_CIF:
             // 24 MHz input clock, divider = 1 -> 30 FPS sensor core
-            c.clk_2x   = 0;
+            c.clk_2x   = 1;
             c.clk_div  = 0;
             c.pclk_div = 2;
             regs       = ov2640_settings_to_cif;
@@ -197,14 +197,16 @@ static int set_window(
     WRITE_REG_OR_RETURN(BANK_DSP, R_DVP_SP, c.pclk);
 
     if (mode == OV2640_MODE_CIF) {
-        // Unlock 30 FPS core timing in BANK_SENSOR:
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x11, 0x00);  // CLKRC = 0x00 (Divider = 1)
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x2A, 0x00);  // Zero horizontal dummy pixels (MSB)
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x2B, 0x00);  // Zero horizontal dummy pixels (LSB)
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x46, 0x00);  // Zero vertical dummy lines (FLL)
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x47, 0x00);  // Zero vertical dummy lines (FLH)
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3C, 0x00);  // Disable 15 FPS auto-halving
-        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3D, 0x38);  // COM34 30 FPS framing
+        // 1. Switch to Sensor Bank
+        write_reg(sensor, BANK_SENSOR, 0xFF, 0x01);
+
+        // 2. Power up internal PLL analog circuitry (Clear PLL Power-Down in COM14 / REG0x3F)
+        write_reg(sensor, BANK_SENSOR, 0x11, 0x80);  // CLKRC: Bit 7 = 1 (Enable 2x PLL), Div = 1
+
+        // 3. Switch to DSP Bank and enable PLL bypass routing
+        write_reg(sensor, BANK_DSP, 0xFF, 0x00);
+        write_reg(sensor, BANK_DSP, 0x05, 0x00);  // R_BYPASS: Ensure DSP uses PLL output, not bypass
+        write_reg(sensor, BANK_DSP, 0xD3, 0x82);  // R_DVP_SP: Auto PCLK, div = 2
     }
 
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_EN);

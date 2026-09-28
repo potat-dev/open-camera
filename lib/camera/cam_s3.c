@@ -96,6 +96,17 @@ static void CAMERA_ISR_IRAM_ATTR cam_s3_vsync_isr(void* arg) {
     LCD_CAM.lc_dma_int_clr.val = status.val;
 
     if (status.cam_vsync_int_st) {
+        static uint32_t last_us   = 0;
+        static uint32_t vsync_cnt = 0;
+        uint32_t        now_us    = esp_timer_get_time();
+        uint32_t        diff_us   = now_us - last_us;
+        last_us                   = now_us;
+
+        if (diff_us > 0 && (++vsync_cnt % 30 == 0)) {
+            uint32_t fps_x10 = 10000000UL / diff_us;
+            esp_rom_printf("HW_VSYNC: %lu us (%lu.%lu FPS)\n", diff_us, fps_x10 / 10, fps_x10 % 10);
+        }
+
         cam_s3_send_event(cam, CAM_VSYNC_EVENT, &HPTaskAwoken);
     }
 
