@@ -160,16 +160,20 @@ static int set_window(
     };
 
     c.clk_2x    = 1;  // Enable 2x PLL (24 MHz * 2 = 48 MHz)
-    c.pclk_auto = 1;
+    c.pclk_auto = 1;  // MUST be 1 for DSP scaling in 480p/768p
 
     switch (mode) {
         case OV2640_MODE_CIF:
+            // 24 MHz base XCLK, divider = 1 -> 24 MHz DSP
+            // PCLK = 12 MHz -> Unlocks 25 - 30 FPS free-running!
+            c.clk_2x   = 0;
             c.clk_div  = 0;
-            c.pclk_div = 4;
+            c.pclk_div = 2;
             regs       = ov2640_settings_to_cif;
             break;
 
         case OV2640_MODE_SVGA:
+            c.clk_2x   = 1;
             c.clk_div  = 3;
             c.pclk_div = 4;
             regs       = ov2640_settings_to_svga;
@@ -177,6 +181,7 @@ static int set_window(
 
         case OV2640_MODE_UXGA:
         default:
+            c.clk_2x   = 1;
             c.clk_div  = 7;
             c.pclk_div = 12;
             regs       = ov2640_settings_to_uxga;
@@ -192,19 +197,20 @@ static int set_window(
     WRITE_REG_OR_RETURN(BANK_SENSOR, CLKRC, c.clk);
     WRITE_REG_OR_RETURN(BANK_DSP, R_DVP_SP, c.pclk);
 
-    WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3c, 0x00);
+    if (mode == OV2640_MODE_CIF) {
+        // 1. Disable 14.3 FPS auto-reduction in analog sensor core
+        WRITE_REG_OR_RETURN(BANK_SENSOR, 0x3C, 0x00);
+
+        // 2. Disable 50Hz/60Hz banding filter lock (Clear Bit 5 of COM8)
+        uint8_t com8 = read_reg(sensor, BANK_SENSOR, COM8);
+        WRITE_REG_OR_RETURN(BANK_SENSOR, COM8, com8 & ~COM8_BNDF_EN);
+    }
 
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_EN);
 
-    // Single settling delay
     vTaskDelay(pdMS_TO_TICKS(5));
 
-    // Refresh DVP output formatting for active resolution
     set_pixformat(sensor, sensor->pixformat);
-
-    if (mode == OV2640_MODE_CIF) {
-        WRITE_REG_OR_RETURN(BANK_DSP, 0xD7, 0x01);
-    }
 
     return ret;
 }
