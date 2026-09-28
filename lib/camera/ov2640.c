@@ -169,14 +169,14 @@ static int set_window(
             // 24 MHz / 4 = 6.0 MHz PCLK -> 30.0 FPS solid in QVGA preview.
             // (If you want ultra-fast 45-50 FPS, change clk_div=0, pclk_div=2)
             c.clk_div  = 1;
-            c.pclk_div = 4;
+            c.pclk_div = 2;
             regs       = ov2640_settings_to_cif;
             break;
 
         case OV2640_MODE_SVGA:
             // 48 MHz / (1 + 1) = 24 MHz internal.
             // 24 MHz / 4 = 6.0 MHz PCLK -> ~15 FPS in VGA mode.
-            c.clk_div  = 1;
+            c.clk_div  = 3;
             c.pclk_div = 4;
             regs       = ov2640_settings_to_svga;
             break;
@@ -185,8 +185,8 @@ static int set_window(
         default:
             // 48 MHz / (1 + 1) = 24 MHz internal.
             // 24 MHz / 4 = 6.0 MHz PCLK -> Full 2MP capture in ~330 ms.
-            c.clk_div  = 1;
-            c.pclk_div = 4;
+            c.clk_div  = 7;
+            c.pclk_div = 12;
             regs       = ov2640_settings_to_uxga;
             break;
     }
