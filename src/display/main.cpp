@@ -571,6 +571,30 @@ void setup() {
     ESP_LOGI("init", "Init done");
 }
 
+void drawOverlay() {
+    constexpr auto HALF_WIDTH   = DISPLAY_WIDTH / 2;
+    constexpr auto HALF_HEIGHT  = DISPLAY_HEIGHT / 2;
+    constexpr auto THIRD_WIDTH  = DISPLAY_WIDTH / 3;
+    constexpr auto THIRD_HEIGHT = DISPLAY_HEIGHT / 3;
+
+    constexpr auto SIZE_H     = DISPLAY_WIDTH / 12;
+    constexpr auto SIZE_V     = DISPLAY_HEIGHT / 9;
+    constexpr auto SIZE_CROSS = DISPLAY_HEIGHT / 12;
+
+    canvas.drawFastHLine(THIRD_WIDTH, THIRD_HEIGHT, SIZE_H, TFT_WHITE);
+    canvas.drawFastHLine(THIRD_WIDTH * 2 - SIZE_H, THIRD_HEIGHT, SIZE_H, TFT_WHITE);
+    canvas.drawFastHLine(THIRD_WIDTH, THIRD_HEIGHT * 2, SIZE_H, TFT_WHITE);
+    canvas.drawFastHLine(THIRD_WIDTH * 2 - SIZE_H, THIRD_HEIGHT * 2, SIZE_H, TFT_WHITE);
+
+    canvas.drawFastVLine(THIRD_WIDTH, THIRD_HEIGHT, SIZE_V, TFT_WHITE);
+    canvas.drawFastVLine(THIRD_WIDTH * 2, THIRD_HEIGHT, SIZE_V, TFT_WHITE);
+    canvas.drawFastVLine(THIRD_WIDTH, THIRD_HEIGHT * 2 - SIZE_V, SIZE_V, TFT_WHITE);
+    canvas.drawFastVLine(THIRD_WIDTH * 2, THIRD_HEIGHT * 2 - SIZE_V, SIZE_V, TFT_WHITE);
+
+    canvas.drawFastHLine(HALF_WIDTH - SIZE_CROSS / 2, HALF_HEIGHT, SIZE_CROSS, TFT_WHITE);
+    canvas.drawFastVLine(HALF_WIDTH, HALF_HEIGHT - SIZE_CROSS / 2, SIZE_CROSS, TFT_WHITE);
+}
+
 void drawFPS() {
     canvas.setTextSize(2);
     canvas.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -603,7 +627,10 @@ void handleViewfinder() {
     framerate.tick();
 
     drawFrame();
-    drawFPS();
+
+    if (showOverlay.value) drawOverlay();
+    if (showFPS.value) drawFPS();
+
     updateDisplay();
 }
 

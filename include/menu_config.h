@@ -58,6 +58,9 @@ const MenuItem* captureSettings[captureSizesCount] = {
     &captureUXGA,
 };
 
+MenuItem showFPS     = {"FPS", MENU_TOGGLE, 0};
+MenuItem showOverlay = {"Overlay", MENU_TOGGLE, 1};
+
 MenuItem expCtrl  = {"ExpCtrl", MENU_TOGGLE, 1};
 MenuItem gainCtrl = {"GainCtrl", MENU_TOGGLE, 1};
 MenuItem colorBar = {"ColorBar", MENU_TOGGLE, 0};
@@ -72,7 +75,7 @@ MenuItem dcw      = {"DCW", MENU_TOGGLE, 1};
 
 MenuItem menuScale = {"TextSize", MENU_INTEGER, 2, nullptr, 0, 2, 3, 1};
 
-constexpr size_t menuItemsCount = 24;
+constexpr size_t menuItemsCount = 26;
 
 MenuItem* menuItems[menuItemsCount] = {
     &contrast,
@@ -87,6 +90,8 @@ MenuItem* menuItems[menuItemsCount] = {
     &captureSVGA,
     &captureXGA,
     &captureUXGA,
+    &showFPS,
+    &showOverlay,
     &expCtrl,
     &gainCtrl,
     &colorBar,
