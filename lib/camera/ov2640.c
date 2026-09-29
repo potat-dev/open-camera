@@ -238,56 +238,68 @@ static int set_framesize(sensor_t* sensor, framesize_t framesize) {
     return ret;
 }
 
+// Master SDE Control helper: preserves Contrast/Brightness (0x04) + Saturation (0x02)
+static int sde_apply_ctrl(sensor_t* sensor) {
+    uint8_t effect      = sensor->status.special_effect;
+    uint8_t effect_mode = (effect < 7) ? special_effects_levels[effect][0] : 0x00;
+
+    // 0x04: Contrast & Brightness calculation enable
+    // 0x02: Saturation calculation enable
+    uint8_t sde_ctrl = 0x06 | effect_mode;
+
+    write_reg(sensor, BANK_DSP, BPADDR, 0x00);
+    return write_reg(sensor, BANK_DSP, BPDATA, sde_ctrl);
+}
+
 static int set_contrast(sensor_t* sensor, int level) {
-    int ret  = 0;
-    level   += 3;
-    if (level <= 0 || level > NUM_CONTRAST_LEVELS) {
-        return -1;
-    }
-    sensor->status.contrast = level - 3;
-    for (int i = 0; i < 7; i++) {
-        WRITE_REG_OR_RETURN(BANK_DSP, contrast_regs[0][i], contrast_regs[level][i]);
-    }
-    return ret;
+    int idx = level + 2;  // Input is -2..+2, map to index 0..4
+    if (idx < 0 || idx >= NUM_CONTRAST_LEVELS) return -1;
+    sensor->status.contrast = level;
+
+    // Write ONLY contrast slope (Addresses 0x07, 0x08)
+    write_reg(sensor, BANK_DSP, BPADDR, 0x07);
+    write_reg(sensor, BANK_DSP, BPDATA, contrast_levels[idx][0]);
+    write_reg(sensor, BANK_DSP, BPDATA, contrast_levels[idx][1]);
+
+    return sde_apply_ctrl(sensor);
 }
 
 static int set_brightness(sensor_t* sensor, int level) {
-    int ret  = 0;
-    level   += 3;
-    if (level <= 0 || level > NUM_BRIGHTNESS_LEVELS) {
-        return -1;
-    }
-    sensor->status.brightness = level - 3;
-    for (int i = 0; i < 5; i++) {
-        WRITE_REG_OR_RETURN(BANK_DSP, brightness_regs[0][i], brightness_regs[level][i]);
-    }
-    return ret;
+    int idx = level + 2;  // Input is -2..+2, map to index 0..4
+    if (idx < 0 || idx >= NUM_BRIGHTNESS_LEVELS) return -1;
+    sensor->status.brightness = level;
+
+    // Write ONLY brightness bias (Addresses 0x09, 0x0A)
+    write_reg(sensor, BANK_DSP, BPADDR, 0x09);
+    write_reg(sensor, BANK_DSP, BPDATA, brightness_levels[idx][0]);
+    write_reg(sensor, BANK_DSP, BPDATA, brightness_levels[idx][1]);
+
+    return sde_apply_ctrl(sensor);
 }
 
 static int set_saturation(sensor_t* sensor, int level) {
-    int ret  = 0;
-    level   += 3;
-    if (level <= 0 || level > NUM_SATURATION_LEVELS) {
-        return -1;
-    }
-    sensor->status.saturation = level - 3;
-    for (int i = 0; i < 5; i++) {
-        WRITE_REG_OR_RETURN(BANK_DSP, saturation_regs[0][i], saturation_regs[level][i]);
-    }
-    return ret;
+    int idx = level + 2;  // Input is -2..+2, map to index 0..4
+    if (idx < 0 || idx >= NUM_SATURATION_LEVELS) return -1;
+    sensor->status.saturation = level;
+
+    // Write ONLY saturation gain (Addresses 0x03, 0x04)
+    write_reg(sensor, BANK_DSP, BPADDR, 0x03);
+    write_reg(sensor, BANK_DSP, BPDATA, saturation_levels[idx][0]);
+    write_reg(sensor, BANK_DSP, BPDATA, saturation_levels[idx][1]);
+
+    return sde_apply_ctrl(sensor);
 }
 
 static int set_special_effect(sensor_t* sensor, int effect) {
-    int ret = 0;
-    effect++;
-    if (effect <= 0 || effect > NUM_SPECIAL_EFFECTS) {
-        return -1;
-    }
-    sensor->status.special_effect = effect - 1;
-    for (int i = 0; i < 5; i++) {
-        WRITE_REG_OR_RETURN(BANK_DSP, special_effects_regs[0][i], special_effects_regs[effect][i]);
-    }
-    return ret;
+    if (effect < 0 || effect >= NUM_SPECIAL_EFFECTS) return -1;
+    sensor->status.special_effect = effect;
+
+    // Write tint offsets (Addresses 0x05, 0x06)
+    write_reg(sensor, BANK_DSP, BPADDR, 0x05);
+    write_reg(sensor, BANK_DSP, BPDATA, special_effects_levels[effect][1]);
+    write_reg(sensor, BANK_DSP, BPDATA, special_effects_levels[effect][2]);
+
+    return sde_apply_ctrl(sensor);
 }
 
 static int set_wb_mode(sensor_t* sensor, int mode) {

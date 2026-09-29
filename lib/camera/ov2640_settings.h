@@ -401,46 +401,44 @@ static const uint8_t ov2640_settings_rgb565[][2] = {
     {0, 0},
 };
 
-#define NUM_BRIGHTNESS_LEVELS (5)
-static const uint8_t brightness_regs[NUM_BRIGHTNESS_LEVELS + 1][5] = {
-    {BPADDR, BPDATA, BPADDR, BPDATA, BPDATA},  // value
-    {0x00, 0x04, 0x09, 0x00, 0x00},            // -2
-    {0x00, 0x04, 0x09, 0x10, 0x00},            // -1
-    {0x00, 0x04, 0x09, 0x20, 0x00},            //  0
-    {0x00, 0x04, 0x09, 0x30, 0x00},            // +1
-    {0x00, 0x04, 0x09, 0x40, 0x00},            // +2
+#define NUM_CONTRAST_LEVELS (5)
+static const uint8_t contrast_levels[NUM_CONTRAST_LEVELS][2] = {
+    {0x20, 0x18},  // -2
+    {0x20, 0x1C},  // -1
+    {0x20, 0x20},  //  0 (Default)
+    {0x20, 0x24},  // +1
+    {0x20, 0x28},  // +2
 };
 
-#define NUM_CONTRAST_LEVELS (5)
-static const uint8_t contrast_regs[NUM_CONTRAST_LEVELS + 1][7] = {
-    {BPADDR, BPDATA, BPADDR, BPDATA, BPDATA, BPDATA, BPDATA},  // value
-    {0x00, 0x04, 0x07, 0x20, 0x18, 0x34, 0x06},                // -2
-    {0x00, 0x04, 0x07, 0x20, 0x1c, 0x2a, 0x06},                // -1
-    {0x00, 0x04, 0x07, 0x20, 0x20, 0x20, 0x06},                //  0
-    {0x00, 0x04, 0x07, 0x20, 0x24, 0x16, 0x06},                // +1
-    {0x00, 0x04, 0x07, 0x20, 0x28, 0x0c, 0x06},                // +2
+#define NUM_BRIGHTNESS_LEVELS (5)
+static const uint8_t brightness_levels[NUM_BRIGHTNESS_LEVELS][2] = {
+    {0x00, 0x00},  // -2
+    {0x10, 0x00},  // -1
+    {0x20, 0x00},  //  0 (Default)
+    {0x30, 0x00},  // +1
+    {0x40, 0x00},  // +2
 };
 
 #define NUM_SATURATION_LEVELS (5)
-static const uint8_t saturation_regs[NUM_SATURATION_LEVELS + 1][5] = {
-    {BPADDR, BPDATA, BPADDR, BPDATA, BPDATA},  // value
-    {0x00, 0x02, 0x03, 0x28, 0x28},            // -2
-    {0x00, 0x02, 0x03, 0x38, 0x38},            // -1
-    {0x00, 0x02, 0x03, 0x48, 0x48},            //  0
-    {0x00, 0x02, 0x03, 0x58, 0x58},            // +1
-    {0x00, 0x02, 0x03, 0x68, 0x68},            // +2
+// Saturation U/V gains (Addresses 0x03, 0x04)
+static const uint8_t saturation_levels[NUM_SATURATION_LEVELS][2] = {
+    {0x28, 0x28},  // -2
+    {0x38, 0x38},  // -1
+    {0x48, 0x48},  //  0 (Default)
+    {0x58, 0x58},  // +1
+    {0x68, 0x68},  // +2
 };
 
 #define NUM_SPECIAL_EFFECTS (7)
-static const uint8_t special_effects_regs[NUM_SPECIAL_EFFECTS + 1][5] = {
-    {BPADDR, BPDATA, BPADDR, BPDATA, BPDATA},  // value
-    {0x00, 0X00, 0x05, 0X80, 0X80},            // no effect
-    {0x00, 0X40, 0x05, 0X80, 0X80},            // negative
-    {0x00, 0X18, 0x05, 0X80, 0X80},            // black and white
-    {0x00, 0X18, 0x05, 0X40, 0XC0},            // reddish
-    {0x00, 0X18, 0x05, 0X40, 0X40},            // greenish
-    {0x00, 0X18, 0x05, 0XA0, 0X40},            // blue
-    {0x00, 0X18, 0x05, 0X40, 0XA6},            // retro
+// Special effects: [Mode bit for 0x00, U tint (0x05), V tint (0x06)]
+static const uint8_t special_effects_levels[NUM_SPECIAL_EFFECTS][3] = {
+    {0x00, 0x80, 0x80},  // None
+    {0x40, 0x80, 0x80},  // Negative
+    {0x18, 0x80, 0x80},  // B&W
+    {0x18, 0x40, 0xC0},  // Reddish
+    {0x18, 0x40, 0x40},  // Greenish
+    {0x18, 0xA0, 0x40},  // Blue
+    {0x18, 0x40, 0xA6},  // Sepia / Retro
 };
 
 #define NUM_WB_MODES (4)
