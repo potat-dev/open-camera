@@ -46,17 +46,34 @@ class Ring {
         sum         -= ring[index];
         ring[index]  = value;
         sum         += value;
-        index        = ++index % CAPACITY;
+        index        = (index + 1) % CAPACITY;
         if (size < CAPACITY) size++;
     }
 
-    float avg() { return (float)sum / size; }
+    float avg() { return size ? (float)sum / size : 0.0f; }
 };
 
-static float    viewfinder_fps = 0.0;
-static uint32_t viewfinder_tmr = 0;
+class FpsCounter {
+   private:
+    Ring     durations;
+    uint32_t tmr;
 
-Ring frametime_ring;
+   public:
+    FpsCounter() : durations(), tmr(0) {}
+
+    void tick() {
+        uint32_t now = millis();
+        if (tmr) durations.push(now - tmr);
+        tmr = now;
+    }
+
+    float fps() {
+        float duration = durations.avg();
+        return duration ? 1000.0f / duration : 0.0f;
+    }
+};
+
+FpsCounter framerate;
 
 // buttons
 
@@ -482,7 +499,6 @@ void transitionTo(State next) {
     switch (state) {
         case VIEWFINDER:
             cam_set_raw_framesize(SIZE_VIEWFINDER);  // TODO: error handling
-            viewfinder_tmr = millis();
             break;
 
         case COUNTDOWN:
@@ -564,7 +580,7 @@ void drawFPS() {
     canvas.setTextSize(2);
     canvas.setTextColor(TFT_WHITE, TFT_BLACK);
     canvas.setTextDatum(lgfx::top_right);
-    canvas.drawFloat(viewfinder_fps, 1, DISPLAY_WIDTH - 24, 24);
+    canvas.drawFloat(framerate.fps(), 1, DISPLAY_WIDTH - 24, 24);
 }
 
 void handleViewfinder() {
@@ -589,16 +605,11 @@ void handleViewfinder() {
     // if (btnB.click()) viewPictures();  // TODO: implement
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
-    if (viewfinder_tmr == 0) viewfinder_tmr = millis();
+    framerate.tick();  // TODO: fix FPS counter when switching to other modes
 
     drawFrame();
     drawFPS();
     updateDisplay();
-
-    uint32_t now = millis();
-    frametime_ring.push(now - viewfinder_tmr);
-    viewfinder_fps = 1000.0f / frametime_ring.avg();
-    viewfinder_tmr = now;
 }
 
 void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
