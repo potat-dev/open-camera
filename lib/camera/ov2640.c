@@ -195,20 +195,6 @@ static int set_window(
     WRITE_REGS_OR_RETURN(win_regs);
     WRITE_REG_OR_RETURN(BANK_SENSOR, CLKRC, c.clk);
     WRITE_REG_OR_RETURN(BANK_DSP, R_DVP_SP, c.pclk);
-
-    if (mode == OV2640_MODE_CIF) {
-        // 1. Switch to Sensor Bank
-        write_reg(sensor, BANK_SENSOR, 0xFF, 0x01);
-
-        // 2. Power up internal PLL analog circuitry (Clear PLL Power-Down in COM14 / REG0x3F)
-        write_reg(sensor, BANK_SENSOR, 0x11, 0x80);  // CLKRC: Bit 7 = 1 (Enable 2x PLL), Div = 1
-
-        // 3. Switch to DSP Bank and enable PLL bypass routing
-        write_reg(sensor, BANK_DSP, 0xFF, 0x00);
-        write_reg(sensor, BANK_DSP, 0x05, 0x00);  // R_BYPASS: Ensure DSP uses PLL output, not bypass
-        write_reg(sensor, BANK_DSP, 0xD3, 0x82);  // R_DVP_SP: Auto PCLK, div = 2
-    }
-
     WRITE_REG_OR_RETURN(BANK_DSP, R_BYPASS, R_BYPASS_DSP_EN);
 
     vTaskDelay(pdMS_TO_TICKS(5));

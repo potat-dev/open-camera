@@ -192,12 +192,12 @@ static void configure_camera() {
     s->set_saturation(s, saturation.value);
     // s->set_ae_level(s, 0);
 
-    // // // image correction values
+    // image correction values
     // s->set_gainceiling(s, GAINCEILING_16X);  // 2X to 128X
-    // s->set_exposure_ctrl(s, 0);              // 0 to 1200
-    // // s->set_aec_value(s, 250);                // 0 to 1200
-    // // s->set_agc_gain(s, 0);                  // 0 to 30
-    // s->set_gain_ctrl(s, 0);  // 0 to 30
+    // s->set_exposure_ctrl(s, 0);
+    // s->set_gain_ctrl(s, 0);
+    // s->set_aec_value(s, 250);  // 0 to 1200
+    // s->set_agc_gain(s, 0);     // 0 to 30
 
     s->set_special_effect(s, effect.value);
     s->set_wb_mode(s, whiteBalance.value);
@@ -558,7 +558,6 @@ void setup() {
     }
 
     ESP_LOGI("init", "Init done");
-    transitionTo(VIEWFINDER);
 }
 
 void drawFPS() {
@@ -589,6 +588,8 @@ void handleViewfinder() {
     // if (btnA.click()) rotateScreen();  // TODO: implement
     // if (btnB.click()) viewPictures();  // TODO: implement
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
+
+    if (viewfinder_tmr == 0) viewfinder_tmr = millis();
 
     drawFrame();
     drawFPS();
