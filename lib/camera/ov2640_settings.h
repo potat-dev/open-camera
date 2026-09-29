@@ -83,8 +83,8 @@ const DRAM_ATTR uint8_t ov2640_settings_cif[][2] = {
     {0x4c, 0x00},
     {0x4a, 0x81},
     {0x21, 0x99},
-    {AEW, 0x40},
-    {AEB, 0x38},
+    {AEW, 0x48},
+    {AEB, 0x30},
     {VV, VV_AGC_TH_SET(8, 2)},
     {0x5c, 0x00},
     {0x63, 0x00},
@@ -457,7 +457,7 @@ static const uint8_t ae_levels_regs[NUM_AE_LEVELS + 1][3] = {
     {AEW, AEB, VV},      // value
     {0x20, 0X18, 0x60},  // -2
     {0x34, 0X1C, 0x00},  // -1
-    {0x3E, 0X38, 0x81},  //  0
+    {0x48, 0X30, 0x81},  //  0
     {0x48, 0X40, 0x81},  // +1
     {0x58, 0X50, 0x92},  // +2
 };

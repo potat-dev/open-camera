@@ -32,14 +32,16 @@ static int16_t photoIndex = NOT_CONNECTED;  // by default: no SD card
 
 class Ring {
    private:
-    static constexpr size_t CAPACITY = 64;
+    static constexpr size_t CAPACITY = 256;
 
-    uint32_t ring[CAPACITY] = {0};
-    size_t   size           = 0;
-    size_t   index          = 0;
-    uint64_t sum            = 0;
+    uint32_t ring[CAPACITY];
+    size_t   size;
+    size_t   index;
+    uint64_t sum;
 
    public:
+    Ring() : size(0), index(0), sum(0) { memset(ring, 0, CAPACITY * sizeof(uint32_t)); }
+
     void push(uint32_t value) {
         sum         -= ring[index];
         ring[index]  = value;
@@ -190,12 +192,12 @@ static void configure_camera() {
     s->set_saturation(s, saturation.value);
     // s->set_ae_level(s, 0);
 
-    // // image correction values
-    s->set_gainceiling(s, GAINCEILING_16X);  // 2X to 128X
-    s->set_exposure_ctrl(s, 0);              // 0 to 1200
-    s->set_aec_value(s, 250);                // 0 to 1200
-    // s->set_agc_gain(s, 0);                  // 0 to 30
-    s->set_gain_ctrl(s, 1);  // 0 to 30
+    // // // image correction values
+    // s->set_gainceiling(s, GAINCEILING_16X);  // 2X to 128X
+    // s->set_exposure_ctrl(s, 0);              // 0 to 1200
+    // // s->set_aec_value(s, 250);                // 0 to 1200
+    // // s->set_agc_gain(s, 0);                  // 0 to 30
+    // s->set_gain_ctrl(s, 0);  // 0 to 30
 
     s->set_special_effect(s, effect.value);
     s->set_wb_mode(s, whiteBalance.value);
@@ -589,16 +591,13 @@ void handleViewfinder() {
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
     drawFrame();
-    // drawFPS();
+    drawFPS();
     updateDisplay();
-
-    static size_t counter = 0;
 
     uint32_t now = millis();
     frametime_ring.push(now - viewfinder_tmr);
     viewfinder_fps = 1000.0f / frametime_ring.avg();
     viewfinder_tmr = now;
-    if (counter++ % 100 == 0) Serial.printf("FPS: %f\n", viewfinder_fps);
 }
 
 void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
