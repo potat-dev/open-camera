@@ -67,3 +67,14 @@ constexpr uint32_t CAMERA_PCLK_FREQ   = 24_MHz;  // 20 works stable, but I love 
 
 // SPI
 constexpr spi_host_device_t SPI_HOST = SPI2_HOST;
+
+// overlay segments
+constexpr int32_t OVER_SEGMENT_W  = DISPLAY_WIDTH / 12;
+constexpr int32_t OVER_SEGMENT_H  = DISPLAY_HEIGHT / 9;
+constexpr int32_t OVER_CROSS_SIZE = DISPLAY_HEIGHT / 12;
+
+// other (auto)
+constexpr int32_t HALF_WIDTH   = DISPLAY_WIDTH / 2;
+constexpr int32_t HALF_HEIGHT  = DISPLAY_HEIGHT / 2;
+constexpr int32_t THIRD_WIDTH  = DISPLAY_WIDTH / 3;
+constexpr int32_t THIRD_HEIGHT = DISPLAY_HEIGHT / 3;

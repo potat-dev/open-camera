@@ -30,51 +30,6 @@ static uint32_t countdown_tmr = 0;
 // TODO: extract into photo manager class
 static int16_t photoIndex = NOT_CONNECTED;  // by default: no SD card
 
-class Ring {
-   private:
-    static constexpr size_t CAPACITY = 256;
-
-    uint32_t ring[CAPACITY];
-    size_t   size;
-    size_t   index;
-    uint64_t sum;
-
-   public:
-    Ring() : size(0), index(0), sum(0) { memset(ring, 0, CAPACITY * sizeof(uint32_t)); }
-
-    void push(uint32_t value) {
-        sum         -= ring[index];
-        ring[index]  = value;
-        sum         += value;
-        index        = (index + 1) % CAPACITY;
-        if (size < CAPACITY) size++;
-    }
-
-    float avg() { return size ? (float)sum / size : 0.0f; }
-};
-
-class FpsCounter {
-   private:
-    Ring     durations;
-    uint32_t tmr;
-
-   public:
-    FpsCounter() : durations(), tmr(0) {}
-
-    void tick() {
-        uint32_t now = millis();
-        if (tmr) durations.push(now - tmr);
-        tmr = now;
-    }
-
-    void pause() { tmr = 0; }
-
-    float fps() {
-        float duration = durations.avg();
-        return duration ? 1000.0f / duration : 0.0f;
-    }
-};
-
 FpsCounter framerate;
 
 // buttons
@@ -83,7 +38,7 @@ Button btnA(BTN_A);
 Button btnB(BTN_B);
 Button btnX(BTN_X);
 
-const std::vector<Button*> buttons = {&btnA, &btnB, &btnX};
+const std::array<Button*, 3> buttons = {&btnA, &btnB, &btnX};
 
 // display
 
@@ -136,7 +91,51 @@ class LGFX_Display : public lgfx::LGFX_Device {
 LGFX_Display display;
 LGFX_Sprite  canvas(&display);
 
-void updateDisplay() { canvas.pushSprite(0, 0); }
+bool displayInit() {
+    bool ok = display.init();
+    if (!ok) return false;
+
+    display.setSwapBytes(false);
+
+    canvas.setPsram(true);
+    canvas.setColorDepth(16);
+    canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+    return true;
+}
+
+void drawFPS() {
+    canvas.setTextSize(2);
+    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+    canvas.setTextDatum(lgfx::top_right);
+    canvas.drawFloat(framerate.fps(), 1, DISPLAY_WIDTH - 24, 24);
+}
+
+void drawCountdown() {
+    char buf[12];
+    sprintf(buf, "Shot in %d", countdown);
+    canvas.setTextSize(4);
+    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
+    canvas.setTextDatum(lgfx::baseline_center);
+    canvas.drawString(buf, DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 24);
+}
+
+void drawOverlay() {
+    canvas.drawFastHLine(THIRD_WIDTH, THIRD_HEIGHT, OVER_SEGMENT_W, TFT_WHITE);
+    canvas.drawFastHLine(THIRD_WIDTH * 2 - OVER_SEGMENT_W, THIRD_HEIGHT, OVER_SEGMENT_W, TFT_WHITE);
+    canvas.drawFastHLine(THIRD_WIDTH, THIRD_HEIGHT * 2, OVER_SEGMENT_W, TFT_WHITE);
+    canvas.drawFastHLine(THIRD_WIDTH * 2 - OVER_SEGMENT_W, THIRD_HEIGHT * 2, OVER_SEGMENT_W, TFT_WHITE);
+
+    canvas.drawFastVLine(THIRD_WIDTH, THIRD_HEIGHT, OVER_SEGMENT_H, TFT_WHITE);
+    canvas.drawFastVLine(THIRD_WIDTH * 2, THIRD_HEIGHT, OVER_SEGMENT_H, TFT_WHITE);
+    canvas.drawFastVLine(THIRD_WIDTH, THIRD_HEIGHT * 2 - OVER_SEGMENT_H, OVER_SEGMENT_H, TFT_WHITE);
+    canvas.drawFastVLine(THIRD_WIDTH * 2, THIRD_HEIGHT * 2 - OVER_SEGMENT_H, OVER_SEGMENT_H, TFT_WHITE);
+
+    canvas.drawFastHLine(HALF_WIDTH - OVER_CROSS_SIZE / 2, HALF_HEIGHT, OVER_CROSS_SIZE, TFT_WHITE);
+    canvas.drawFastVLine(HALF_WIDTH, HALF_HEIGHT - OVER_CROSS_SIZE / 2, OVER_CROSS_SIZE, TFT_WHITE);
+}
+
+void displayUpdate() { canvas.pushSprite(0, 0); }
 
 // camera
 
@@ -213,11 +212,16 @@ static void configure_camera() {
     s->set_wb_mode(s, whiteBalance.value);
 }
 
-bool camera_init() {
-    cam_deinit();
+void cameraMirror() {
+    hFlip.value = !hFlip.value;
+    sensor_t* s = cam_sensor_get();
+    s->set_hmirror(s, hFlip.value);
+}
 
+bool cameraInit() {
     camera_config_t config = build_camera_config();
-    esp_err_t       err    = cam_init(&config);
+
+    esp_err_t err = cam_init(&config);
     if (err != ESP_OK) return false;
 
     configure_camera();
@@ -295,6 +299,17 @@ void unmountSD() {
 }
 
 // capture
+
+void drawFrame() {
+    camera_fb_t* fb = cam_fb_get();
+    if (fb == NULL) {
+        ESP_LOGE("frame", "Capture failed");
+        return;
+    }
+
+    canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
+    cam_fb_return(fb);
+}
 
 bool saveRawFrame(const camera_fb_t* frame, const char* filename) {
     File file = SD.open(filename, FILE_WRITE, true);
@@ -458,17 +473,6 @@ bool capture() {
     return true;
 }
 
-void drawFrame() {
-    camera_fb_t* fb = cam_fb_get();
-    if (fb == NULL) {
-        ESP_LOGE("frame", "Capture failed");
-        return;
-    }
-
-    canvas.pushImage(0, 0, fb->width, fb->height, (uint16_t*)fb->buf);
-    cam_fb_return(fb);
-}
-
 void transitionTo(State next) {
     // exit action
     switch (state) {
@@ -503,7 +507,7 @@ void transitionTo(State next) {
 
         case PICTURE:
             drawFrame();  // draw frame without countdown
-            updateDisplay();
+            displayUpdate();
             capture();
             // TODO: conditional auto exit to viewfinder
             break;
@@ -526,19 +530,6 @@ void initSPI() {
     pinMode(SPI_MISO, INPUT_PULLUP);
 }
 
-bool initDisplay() {
-    bool ok = display.init();
-    if (!ok) return false;
-
-    display.setSwapBytes(false);
-
-    canvas.setPsram(true);
-    canvas.setColorDepth(16);
-    canvas.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-    return true;
-}
-
 void setup() {
     bool ok;
 
@@ -556,50 +547,19 @@ void setup() {
         ESP_LOGE("init", "Failed to mount SD card");
     }
 
-    ok = camera_init();
+    ok = cameraInit();
     if (!ok) {
         ESP_LOGE("init", "Camera init failed");
         return;
     }
 
-    ok = initDisplay();
+    ok = displayInit();
     if (!ok) {
         ESP_LOGE("init", "Display init failed");
         return;
     }
 
     ESP_LOGI("init", "Init done");
-}
-
-void drawOverlay() {
-    constexpr auto HALF_WIDTH   = DISPLAY_WIDTH / 2;
-    constexpr auto HALF_HEIGHT  = DISPLAY_HEIGHT / 2;
-    constexpr auto THIRD_WIDTH  = DISPLAY_WIDTH / 3;
-    constexpr auto THIRD_HEIGHT = DISPLAY_HEIGHT / 3;
-
-    constexpr auto SIZE_H     = DISPLAY_WIDTH / 12;
-    constexpr auto SIZE_V     = DISPLAY_HEIGHT / 9;
-    constexpr auto SIZE_CROSS = DISPLAY_HEIGHT / 12;
-
-    canvas.drawFastHLine(THIRD_WIDTH, THIRD_HEIGHT, SIZE_H, TFT_WHITE);
-    canvas.drawFastHLine(THIRD_WIDTH * 2 - SIZE_H, THIRD_HEIGHT, SIZE_H, TFT_WHITE);
-    canvas.drawFastHLine(THIRD_WIDTH, THIRD_HEIGHT * 2, SIZE_H, TFT_WHITE);
-    canvas.drawFastHLine(THIRD_WIDTH * 2 - SIZE_H, THIRD_HEIGHT * 2, SIZE_H, TFT_WHITE);
-
-    canvas.drawFastVLine(THIRD_WIDTH, THIRD_HEIGHT, SIZE_V, TFT_WHITE);
-    canvas.drawFastVLine(THIRD_WIDTH * 2, THIRD_HEIGHT, SIZE_V, TFT_WHITE);
-    canvas.drawFastVLine(THIRD_WIDTH, THIRD_HEIGHT * 2 - SIZE_V, SIZE_V, TFT_WHITE);
-    canvas.drawFastVLine(THIRD_WIDTH * 2, THIRD_HEIGHT * 2 - SIZE_V, SIZE_V, TFT_WHITE);
-
-    canvas.drawFastHLine(HALF_WIDTH - SIZE_CROSS / 2, HALF_HEIGHT, SIZE_CROSS, TFT_WHITE);
-    canvas.drawFastVLine(HALF_WIDTH, HALF_HEIGHT - SIZE_CROSS / 2, SIZE_CROSS, TFT_WHITE);
-}
-
-void drawFPS() {
-    canvas.setTextSize(2);
-    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
-    canvas.setTextDatum(lgfx::top_right);
-    canvas.drawFloat(framerate.fps(), 1, DISPLAY_WIDTH - 24, 24);
 }
 
 void handleViewfinder() {
@@ -613,16 +573,11 @@ void handleViewfinder() {
         return;
     }
 
-    // if (btnA.click()) rotateCCW();    // TODO: implement
-    // if (btnB.click()) rotateCW();     // TODO: implement
-    // if (btnA.hold()) flipScreen();    // TODO: implement (hFlip)
-    // if (btnB.hold()) viewPictures();  // TODO: implement
-
-    // or
-
     // if (btnA.click()) rotateScreen();  // TODO: implement
+
+    if (btnA.hold()) cameraMirror();
+
     // if (btnB.click()) viewPictures();  // TODO: implement
-    // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
     framerate.tick();
 
@@ -631,7 +586,7 @@ void handleViewfinder() {
     if (showOverlay.value) drawOverlay();
     if (showFPS.value) drawFPS();
 
-    updateDisplay();
+    displayUpdate();
 }
 
 void drawMenu() { menu.draw(canvas, 16, menuScale.value); }
@@ -654,16 +609,7 @@ void handleSettings() {
 
     drawFrame();
     drawMenu();
-    updateDisplay();
-}
-
-void drawCountdown() {
-    char buf[12];
-    sprintf(buf, "Shot in %d", countdown);
-    canvas.setTextSize(4);
-    canvas.setTextColor(TFT_WHITE, TFT_BLACK);
-    canvas.setTextDatum(lgfx::baseline_center);
-    canvas.drawString(buf, DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 24);
+    displayUpdate();
 }
 
 int8_t getCountdownInc(int8_t amount) {
@@ -710,7 +656,7 @@ void handleCountdown() {
 
     drawFrame();
     drawCountdown();
-    updateDisplay();
+    displayUpdate();
 }
 
 void handlePicture() {
@@ -724,8 +670,8 @@ void handlePicture() {
     // pic_3 (current) -> pic_2 (prev) -> pic_1 -> pic_0
     // pressing next goes other direction and loops to pic_0
 
-    // TODO: read from SD card and shrink to display size (generate thumbnail)
     // TODO: pre-load prev and next thumbnail and store in RAM
+    // some manager class with buffer could do that
 }
 
 void loop() {
