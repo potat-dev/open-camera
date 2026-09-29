@@ -461,17 +461,6 @@ static int set_res_raw(sensor_t* sensor, int startX, int startY, int endX, int e
     return set_window(sensor, (ov2640_sensor_mode_t)startX, offsetX, offsetY, totalX, totalY, outputX, outputY);
 }
 
-static int _set_pll(sensor_t* sensor, int bypass, int multiplier, int sys_div, int root_2x, int pre_div, int seld5,
-    int pclk_manual, int pclk_div) {
-    return -1;
-}
-
-static int set_xclk(sensor_t* sensor, int timer, int xclk) {
-    (void)timer;
-    (void)xclk;
-    return 0;  // Sensor has its own oscillator
-}
-
 static int init_status(sensor_t* sensor) {
     sensor->status.brightness     = 0;
     sensor->status.contrast       = 0;
@@ -568,8 +557,6 @@ int esp32_camera_ov2640_init(sensor_t* sensor) {
     sensor->get_reg     = get_reg;
     sensor->set_reg     = set_reg;
     sensor->set_res_raw = set_res_raw;
-    sensor->set_pll     = _set_pll;
-    sensor->set_xclk    = set_xclk;
 
     ESP_LOGD(TAG, "OV2640 Attached");
     return 0;

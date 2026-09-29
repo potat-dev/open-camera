@@ -36,28 +36,6 @@
 
 static const char* TAG = "cam_s3";
 
-void cam_s3_dma_print_state(cam_obj_t* cam) {
-    esp_rom_printf("dma_infifo_status[%u]  :\n", cam->dma_num);
-    esp_rom_printf("  infifo_full_l1       : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l1);
-    esp_rom_printf("  infifo_empty_l1      : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l1);
-    esp_rom_printf("  infifo_full_l2       : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l2);
-    esp_rom_printf("  infifo_empty_l2      : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l2);
-    esp_rom_printf("  infifo_full_l3       : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_full_l3);
-    esp_rom_printf("  infifo_empty_l3      : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_empty_l3);
-    esp_rom_printf("  infifo_cnt_l1        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l1);
-    esp_rom_printf("  infifo_cnt_l2        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l2);
-    esp_rom_printf("  infifo_cnt_l3        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.infifo_cnt_l3);
-    esp_rom_printf("  in_remain_under_1b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_1b_l3);
-    esp_rom_printf("  in_remain_under_2b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_2b_l3);
-    esp_rom_printf("  in_remain_under_3b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_3b_l3);
-    esp_rom_printf("  in_remain_under_4b_l3: %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_remain_under_4b_l3);
-    esp_rom_printf("  in_buf_hungry        : %lu\n", GDMA.channel[cam->dma_num].in.infifo_status.in_buf_hungry);
-    esp_rom_printf("dma_state[%u]          :\n", cam->dma_num);
-    esp_rom_printf("  dscr_addr            : 0x%lx\n", GDMA.channel[cam->dma_num].in.state.dscr_addr);
-    esp_rom_printf("  in_dscr_state        : %lu\n", GDMA.channel[cam->dma_num].in.state.in_dscr_state);
-    esp_rom_printf("  in_state             : %lu\n", GDMA.channel[cam->dma_num].in.state.in_state);
-}
-
 void cam_s3_dma_reset(cam_obj_t* cam) {
     GDMA.channel[cam->dma_num].in.int_clr.val = ~0;
     GDMA.channel[cam->dma_num].in.int_ena.val = 0;
@@ -96,6 +74,7 @@ static void CAMERA_ISR_IRAM_ATTR cam_s3_vsync_isr(void* arg) {
     LCD_CAM.lc_dma_int_clr.val = status.val;
 
     if (status.cam_vsync_int_st) {
+#ifdef CAMERA_LOG_HW_VSYNC
         static uint32_t last_us   = 0;
         static uint32_t vsync_cnt = 0;
         uint32_t        now_us    = esp_timer_get_time();
@@ -106,7 +85,7 @@ static void CAMERA_ISR_IRAM_ATTR cam_s3_vsync_isr(void* arg) {
             uint32_t fps_x10 = 10000000UL / diff_us;
             esp_rom_printf("HW_VSYNC: %lu us (%lu.%lu FPS)\n", diff_us, fps_x10 / 10, fps_x10 % 10);
         }
-
+#endif
         cam_s3_send_event(cam, CAM_VSYNC_EVENT, &HPTaskAwoken);
     }
 
@@ -533,18 +512,5 @@ esp_err_t cam_s3_set_sample_mode(cam_obj_t* cam, pixformat_t pix_format, uint32_
         ESP_LOGE(TAG, "Requested format is not supported");
         return ESP_ERR_NOT_SUPPORTED;
     }
-    return ESP_OK;
-}
-
-// implements function from xclk.c to allow dynamic XCLK change
-esp_err_t xclk_timer_conf(int ledc_timer, int xclk_freq_hz) {
-    LCD_CAM.cam_ctrl.cam_update       = 1;
-    LCD_CAM.cam_ctrl.cam_clkm_div_b   = 0;
-    LCD_CAM.cam_ctrl.cam_clkm_div_a   = 0;
-    LCD_CAM.cam_ctrl.cam_clkm_div_num = 160000000 / xclk_freq_hz;
-
-    // Select Camera module source clock. 0: no clock. 1: APLL. 2: CLK160. 3: no clock.
-    LCD_CAM.cam_ctrl.cam_clk_sel = 3;
-
     return ESP_OK;
 }

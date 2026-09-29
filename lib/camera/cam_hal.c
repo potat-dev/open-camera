@@ -630,14 +630,7 @@ esp_err_t cam_config(const camera_config_t* config, framesize_t frame_size, uint
     cam_obj->event_queue = xQueueCreate(16, sizeof(cam_event_t));
     CAM_CHECK_GOTO(cam_obj->event_queue != NULL, "event_queue create failed", err);
 
-    frame_buffer_queue_len = cam_obj->frame_cnt;
-
-#ifdef OLD_MODE
-    if (config->grab_mode == CAMERA_GRAB_LATEST && cam_obj->frame_cnt > 1) {
-        frame_buffer_queue_len = cam_obj->frame_cnt - 1;
-    }
-#endif
-
+    frame_buffer_queue_len      = cam_obj->frame_cnt;
     cam_obj->frame_buffer_queue = xQueueCreate(frame_buffer_queue_len, sizeof(camera_fb_t*));
     CAM_CHECK_GOTO(cam_obj->frame_buffer_queue != NULL, "frame_buffer_queue create failed", err);
 

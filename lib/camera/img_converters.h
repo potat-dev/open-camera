@@ -27,8 +27,8 @@ typedef size_t (*jpg_out_cb)(void* arg, size_t index, const void* data, size_t l
  *
  * @return true on success
  */
-bool fmt2jpg_cb(const uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t quality,
-    jpg_out_cb cb, void* arg);
+bool fmt2jpg_cb(const uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format,
+    uint8_t quality, jpg_out_cb cb, void* arg);
 
 /**
  * @brief Convert camera frame buffer to JPEG
@@ -71,33 +71,6 @@ bool fmt2jpg(uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixf
  * @return true on success
  */
 bool frame2jpg(camera_fb_t* fb, uint8_t quality, uint8_t** out, size_t* out_len);
-
-/**
- * @brief Convert image buffer to BMP buffer
- *
- * @param src       Source buffer in JPEG, RGB565, RGB888, YUYV or GRAYSCALE format
- * @param src_len   Length in bytes of the source buffer
- * @param width     Width in pixels of the source image
- * @param height    Height in pixels of the source image
- * @param format    Format of the source image
- * @param out       Pointer to be populated with the address of the resulting buffer
- * @param out_len   Pointer to be populated with the length of the output buffer
- *
- * @return true on success
- */
-bool fmt2bmp(
-    uint8_t* src, size_t src_len, uint16_t width, uint16_t height, pixformat_t format, uint8_t** out, size_t* out_len);
-
-/**
- * @brief Convert camera frame buffer to BMP buffer
- *
- * @param fb        Source camera frame buffer
- * @param out       Pointer to be populated with the address of the resulting buffer
- * @param out_len   Pointer to be populated with the length of the output buffer
- *
- * @return true on success
- */
-bool frame2bmp(camera_fb_t* fb, uint8_t** out, size_t* out_len);
 
 /**
  * @brief Convert image buffer to RGB888 buffer (used for face detection)
