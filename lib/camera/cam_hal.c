@@ -345,6 +345,22 @@ static void cam_task(void* arg) {
                 } else if (cam_event == CAM_VSYNC_EVENT) {
                     cam_s3_stop(cam_obj);
 
+                    // If short by one DMA block, pull the in-flight EOF event before validating size
+                    if (!cam_obj->jpeg_mode &&
+                        frame_buffer_event->len == (cam_obj->recv_size - cam_obj->dma_half_buffer_size)) {
+                        cam_event_t trailing_event;
+                        if (xQueueReceive(cam_obj->event_queue, &trailing_event, pdMS_TO_TICKS(5)) == pdTRUE) {
+                            if (trailing_event == CAM_IN_SUC_EOF_EVENT) {
+                                frame_buffer_event->len +=
+                                    cam_s3_memcpy(cam_obj, &frame_buffer_event->buf[frame_buffer_event->len],
+                                        &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) *
+                                                             cam_obj->dma_half_buffer_size],
+                                        cam_obj->dma_half_buffer_size);
+                                cnt++;
+                            }
+                        }
+                    }
+
                     if (cnt || !cam_obj->jpeg_mode || cam_obj->psram_mode) {
                         if (cam_obj->jpeg_mode) {
                             if (!cam_obj->psram_mode) {

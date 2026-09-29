@@ -273,11 +273,12 @@ esp_err_t cam_s3_config(cam_obj_t* cam, const camera_config_t* config) {
     LCD_CAM.cam_ctrl.cam_clkm_div_a   = 0;
     LCD_CAM.cam_ctrl.cam_clkm_div_num = 160000000 / config->xclk_freq_hz;
 
-    // Select Camera module source clock. 0: no clock. 1: APLL. 2: CLK160. 3: no clock.
+    // Select Camera module source clock
+    // 0: no clock, 1: XTAL_CLK, 2: PLL_D2_CLK, 3: PLL_F160M_CLK
     LCD_CAM.cam_ctrl.cam_clk_sel = 3;
 
     LCD_CAM.cam_ctrl.cam_stop_en            = 0;
-    LCD_CAM.cam_ctrl.cam_vsync_filter_thres = 4;  // Filter by LCD_CAM clock
+    LCD_CAM.cam_ctrl.cam_vsync_filter_thres = 7;  // Filter by LCD_CAM clock
     LCD_CAM.cam_ctrl.cam_update             = 0;
     LCD_CAM.cam_ctrl.cam_byte_order         = cam->swap_data;
     LCD_CAM.cam_ctrl.cam_bit_order          = 0;
