@@ -67,6 +67,8 @@ class FpsCounter {
         tmr = now;
     }
 
+    void pause() { tmr = 0; }
+
     float fps() {
         float duration = durations.avg();
         return duration ? 1000.0f / duration : 0.0f;
@@ -481,6 +483,10 @@ void drawFrame() {
 void transitionTo(State next) {
     // exit action
     switch (state) {
+        case VIEWFINDER:
+            framerate.pause();
+            break;
+
         case SETTINGS:
             if (menu.changed()) configure_camera();
             break;
@@ -605,7 +611,7 @@ void handleViewfinder() {
     // if (btnB.click()) viewPictures();  // TODO: implement
     // if (btnA.hold()) flipScreen();     // TODO: implement (hFlip)
 
-    framerate.tick();  // TODO: fix FPS counter when switching to other modes
+    framerate.tick();
 
     drawFrame();
     drawFPS();
